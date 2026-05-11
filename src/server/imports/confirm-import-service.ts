@@ -412,7 +412,7 @@ export async function confirmImport(importId: string): Promise<void> {
   const fileBuffer = Buffer.from(fileBase64, "base64");
   const sheetName = importRecord.sheetName ?? "";
 
-  const parsed = parseSpreadsheetSheetFull(fileBuffer, sheetName, templateType);
+  const parsed = await parseSpreadsheetSheetFull(fileBuffer, sheetName, templateType);
   logInfo("confirmImport", `Parse complete`, { importId, templateType });
 
   try {

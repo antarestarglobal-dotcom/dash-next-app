@@ -27,7 +27,7 @@ export async function createImportPreview(
   // Store raw file as base64 so confirm step can re-parse without re-upload
   const rawBase64 = fileBuffer.toString("base64");
 
-  const sheetResults = parseSpreadsheetBufferPreview(fileBuffer);
+  const sheetResults = await parseSpreadsheetBufferPreview(fileBuffer);
   const results: ImportPreviewResult[] = [];
 
   for (const sheet of sheetResults) {

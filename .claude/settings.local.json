@@ -3,7 +3,8 @@
     "allow": [
       "Bash(npx tsc *)",
       "Bash(xargs grep -l \"serverActions\\\\|bodySizeLimit\\\\|maxDuration\")",
-      "Bash(node -e \"const XLSX = require\\('xlsx'\\); console.log\\(XLSX.version\\)\")"
+      "Bash(node -e \"const XLSX = require\\('xlsx'\\); console.log\\(XLSX.version\\)\")",
+      "Bash(node -e \"require\\('exceljs'\\); console.log\\('ok'\\)\")"
     ]
   }
 }
