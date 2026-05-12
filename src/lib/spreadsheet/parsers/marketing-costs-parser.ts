@@ -70,6 +70,8 @@ export const parseMarketingCosts = (rows: readonly unknown[][]): MarketingCostsP
   if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["date", "variable"]);
   if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["date", "type"]);
   if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["tanggal", "biaya"]);
+  if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["tanggal", "nominal"]);
+  if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["tanggal", "tipe"]);
   if (headerIndex < 0) return { templateType: "marketing_costs", summary: { totalRows: 0, validRows: 0, rejectedRowsCount: 0 }, rows: [], warnings: ["Header marketing tidak ditemukan"], rejectedRows: [] };
   const columns = buildColumnMap(rows[headerIndex] ?? []);
   const parsed = nonEmptyDataRows(rows, headerIndex).map((row, index) => ({ row, index, parsed: MarketingCostRowSchema.safeParse(toRawMarketingRow(row, columns)) }));
