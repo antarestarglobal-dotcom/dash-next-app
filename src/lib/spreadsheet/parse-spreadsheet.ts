@@ -353,32 +353,57 @@ export async function parseSpreadsheetBufferPreview(buffer: Buffer): Promise<She
   return results;
 }
 
-export async function parseSpreadsheetSheetFull(
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "cohort_hourly",
+): Promise<ParsedResultByTemplate["cohort_hourly"]>;
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "host_gmv",
+): Promise<ParsedResultByTemplate["host_gmv"]>;
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "order_detail",
+): Promise<ParsedResultByTemplate["order_detail"]>;
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "master_product",
+): Promise<ParsedResultByTemplate["master_product"]>;
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "host_okr",
+): Promise<ParsedResultByTemplate["host_okr"]>;
+export function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
   templateType: "sales_line_items",
-): ParsedResultByTemplate["sales_line_items"];
+): Promise<ParsedResultByTemplate["sales_line_items"]>;
 export function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
   templateType: "marketing_costs",
-): ParsedResultByTemplate["marketing_costs"];
+): Promise<ParsedResultByTemplate["marketing_costs"]>;
 export function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
   templateType: "stock_snapshot",
-): ParsedResultByTemplate["stock_snapshot"];
+): Promise<ParsedResultByTemplate["stock_snapshot"]>;
 export function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
   templateType: "sales_targets",
-): ParsedResultByTemplate["sales_targets"];
+): Promise<ParsedResultByTemplate["sales_targets"]>;
 export function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
   templateType: "daily_performance",
-): ParsedResultByTemplate["daily_performance"];
-export function parseSpreadsheetSheetFull(
+): Promise<ParsedResultByTemplate["daily_performance"]>;
+export async function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
   templateType: ParsedTemplateType,

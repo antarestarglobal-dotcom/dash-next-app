@@ -1,13 +1,97 @@
 "use client";
 
+import { useMemo } from "react";
 import { BrutalCard } from "@/components/ui/BrutalCard";
-import { formatPct, formatRpCompact } from "@/lib/format";
+import { formatPct, formatRpCompact, formatShortDate } from "@/lib/format";
 import type { MoMMetric } from "@/lib/validators/run-rate";
 
 type Props = Readonly<{ rows: readonly MoMMetric[] }>;
 
-export const MoMTable = ({ rows }: Props) => (
-  <BrutalCard title="MoM Table">
-    <table className="w-full text-sm"><thead><tr>{["Tanggal", "Bulan", "Net Sales", "Net Profit", "NPM", "Chance"].map((header) => <th key={header} className="p-2 text-left">{header}</th>)}</tr></thead><tbody>{rows.map((row) => <tr key={`${row.month}-${row.date}`} className="border-t"><td className="p-2">{row.dayOfMonth}</td><td className="p-2">{row.month}</td><td className="p-2">{formatRpCompact(row.netSales)}</td><td className="p-2">{formatRpCompact(row.netProfit)}</td><td className="p-2">{formatPct(row.npm)}</td><td className={row.chance >= 0 ? "p-2 text-green-700" : "p-2 text-red-700"}>{formatPct(row.chance)}</td></tr>)}</tbody></table>
-  </BrutalCard>
-);
+export const MoMTable = ({ rows }: Props) => {
+  const months = useMemo(
+    () => [...new Set(rows.map((r) => r.month))].sort((a, b) => b.localeCompare(a)),
+    [rows],
+  );
+  const days = useMemo(
+    () => [...new Set(rows.map((r) => r.dayOfMonth))].sort((a, b) => a - b),
+    [rows],
+  );
+
+  const lookup = useMemo(() => {
+    const m = new Map<string, MoMMetric>();
+    for (const row of rows) m.set(`${row.month}|${row.dayOfMonth}`, row);
+    return m;
+  }, [rows]);
+
+  if (rows.length === 0) {
+    return (
+      <BrutalCard title="Detail MoM per Hari">
+        <p className="text-sm text-neutral-400 text-center py-8">Belum ada data.</p>
+      </BrutalCard>
+    );
+  }
+
+  return (
+    <BrutalCard title="Detail MoM per Hari">
+      <div className="overflow-x-auto -mx-5">
+        <table className="w-full text-xs">
+          <thead>
+            <tr className="border-b-2 border-neutral-950 bg-stone-100 text-[10px] uppercase tracking-widest">
+              <th className="text-left px-3 py-2 sticky left-0 bg-stone-100">Tgl</th>
+              {months.map((m) => (
+                <th key={m} colSpan={3} className="text-center px-3 py-2 border-l border-neutral-300">
+                  {m}
+                </th>
+              ))}
+            </tr>
+            <tr className="border-b border-neutral-200 bg-stone-50 text-[10px] text-neutral-500">
+              <th className="px-3 py-1 sticky left-0 bg-stone-50" />
+              {months.map((m) => (
+                <>
+                  <th key={`${m}-ns`} className="text-right px-3 py-1 border-l border-neutral-200">Sales</th>
+                  <th key={`${m}-npm`} className="text-right px-3 py-1">NPM</th>
+                  <th key={`${m}-ch`} className="text-right px-3 py-1">Chance</th>
+                </>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((day) => {
+              const firstMonth = months[0];
+              const firstRow = lookup.get(`${firstMonth}|${day}`);
+              return (
+                <tr key={day} className="border-b border-neutral-100 hover:bg-stone-50">
+                  <td className="px-3 py-2 font-bold sticky left-0 bg-white">
+                    {firstRow ? formatShortDate(firstRow.date) : `Hari ${day}`}
+                  </td>
+                  {months.map((m) => {
+                    const row = lookup.get(`${m}|${day}`);
+                    return (
+                      <>
+                        <td key={`${m}-ns`} className="px-3 py-2 text-right border-l border-neutral-100 font-bold">
+                          {row ? formatRpCompact(row.netSales) : <span className="text-neutral-300">—</span>}
+                        </td>
+                        <td key={`${m}-npm`} className="px-3 py-2 text-right">
+                          {row ? formatPct(row.npm, 1) : <span className="text-neutral-300">—</span>}
+                        </td>
+                        <td key={`${m}-ch`} className="px-3 py-2 text-right">
+                          {row ? (
+                            <span className={row.chance >= 0 ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
+                              {row.chance >= 0 ? "+" : ""}{formatPct(row.chance, 1)}
+                            </span>
+                          ) : (
+                            <span className="text-neutral-300">—</span>
+                          )}
+                        </td>
+                      </>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </BrutalCard>
+  );
+};
