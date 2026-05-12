@@ -655,19 +655,19 @@ export async function confirmImport(importId: string): Promise<void> {
         await confirmHostOkr(await parseSpreadsheetSheetFull(fileBuffer, sheetName, "host_okr"), importId);
         break;
       case "sales_line_items":
-        await confirmSalesLineItems(parseSpreadsheetSheetFull(fileBuffer, sheetName, "sales_line_items"), importId);
+        await confirmSalesLineItems(await parseSpreadsheetSheetFull(fileBuffer, sheetName, "sales_line_items"), importId);
         break;
       case "marketing_costs":
-        await confirmMarketingCosts(parseSpreadsheetSheetFull(fileBuffer, sheetName, "marketing_costs"), importId);
+        await confirmMarketingCosts(await parseSpreadsheetSheetFull(fileBuffer, sheetName, "marketing_costs"), importId);
         break;
       case "stock_snapshot":
-        await confirmStockSnapshot(parseSpreadsheetSheetFull(fileBuffer, sheetName, "stock_snapshot"), importId);
+        await confirmStockSnapshot(await parseSpreadsheetSheetFull(fileBuffer, sheetName, "stock_snapshot"), importId);
         break;
       case "sales_targets":
-        await confirmSalesTargets(parseSpreadsheetSheetFull(fileBuffer, sheetName, "sales_targets"), importId);
+        await confirmSalesTargets(await parseSpreadsheetSheetFull(fileBuffer, sheetName, "sales_targets"), importId);
         break;
       case "daily_performance":
-        await confirmDailyPerformance(parseSpreadsheetSheetFull(fileBuffer, sheetName, "daily_performance"), importId);
+        await confirmDailyPerformance(await parseSpreadsheetSheetFull(fileBuffer, sheetName, "daily_performance"), importId);
         break;
     }
 
