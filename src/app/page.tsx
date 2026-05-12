@@ -1,26 +1,18 @@
 import Link from "next/link";
 import { BrutalCard } from "@/components/ui/BrutalCard";
 import { BrutalButton } from "@/components/ui/BrutalButton";
-import { BarChart2, Upload, History, TrendingUp } from "lucide-react";
+import { LayoutDashboard, Upload, History } from "lucide-react";
 
 const CARDS = [
   {
-    href: "/run-rate",
-    icon: TrendingUp,
-    title: "Run Rate Dashboard",
-    description: "Net Sales, NPM, marketing ratio, target progress, MoM, produk, dan stok — semua dalam satu tampilan.",
-    cta: "Buka Run Rate",
-    variant: "primary" as const,
-    highlight: true,
-  },
-  {
-    href: "/dashboard",
-    icon: BarChart2,
-    title: "Dashboard Cohort",
-    description: "GMV harian, hourly heatmap, dan host leaderboard dari data cohort.",
-    cta: "Buka Dashboard",
+    href: "/global",
+    icon: LayoutDashboard,
+    title: "Global Command Center",
+    description:
+      "Semua visual utama dalam satu halaman: Overview, Products, DoD, Funnel, Marketing, Stock, dan MoM.",
+    cta: "Buka Global",
     variant: "secondary" as const,
-    highlight: false,
+    highlight: true,
   },
   {
     href: "/imports",

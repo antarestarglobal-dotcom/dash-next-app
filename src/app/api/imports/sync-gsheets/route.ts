@@ -50,14 +50,14 @@ export async function POST(req: NextRequest) {
     if (gResponse.status === 401 || gResponse.status === 403) {
       throw new DomainError(
         "FETCH_ERROR",
-        `Google Sheets mengembalikan HTTP ${gResponse.status}. Buka spreadsheet → Share → General access → pilih "Anyone with the link" = Viewer.`,
+        `Google Sheets mengembalikan HTTP ${gResponse.status}. Pastikan: (1) Share → General access = "Anyone with the link (Viewer)", (2) setting file "Viewers and commenters can see the option to download, print, and copy" dalam keadaan ON, dan (3) tidak dibatasi policy Google Workspace/domain.`,
       );
     }
 
     if (!gResponse.ok) {
       throw new DomainError(
         "FETCH_ERROR",
-        `Google Sheets mengembalikan HTTP ${gResponse.status}. Pastikan spreadsheet diset "Anyone with the link = Viewer".`,
+        `Google Sheets mengembalikan HTTP ${gResponse.status}. Pastikan file publik dan bisa diunduh oleh viewer (download/copy tidak diblok).`,
       );
     }
 
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
     if (finalUrl.includes("accounts.google.com") || finalUrl.includes("ServiceLogin")) {
       throw new DomainError(
         "FETCH_ERROR",
-        'Google mengalihkan ke halaman login. Buka spreadsheet → Share → General access → pilih "Anyone with the link" = Viewer, lalu coba lagi.',
+        'Google mengalihkan ke halaman login. Biasanya ini terjadi karena file belum publik untuk download, opsi download/copy dimatikan, atau policy domain memblokir akses anonim.',
       );
     }
 
@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
     if (contentType.includes("text/html") || contentType.includes("text/plain")) {
       throw new DomainError(
         "FETCH_ERROR",
-        'Google mengalihkan ke halaman login. Buka spreadsheet → Share → General access → pilih "Anyone with the link" = Viewer, lalu coba lagi.',
+        'Google tidak mengembalikan file XLSX (mendapat HTML/text). Biasanya file dialihkan ke login/permission page. Cek setting share + download/copy permission.',
       );
     }
 

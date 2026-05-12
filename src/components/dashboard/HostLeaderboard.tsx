@@ -5,7 +5,7 @@ import { BrutalCard } from "@/components/ui/BrutalCard";
 import { BrutalDataTable, type BrutalColumn } from "@/components/ui/BrutalDataTable";
 import { formatCurrency } from "@/lib/utils";
 
-interface HostRow {
+export interface HostRow {
   hostId: number | null;
   hostName: string;
   totalGmv: number | null;
@@ -36,9 +36,10 @@ const columns: BrutalColumn<RankedHostRow>[] = [
 
 interface HostLeaderboardProps {
   data: HostRow[];
+  pageSize?: number;
 }
 
-export function HostLeaderboard({ data }: HostLeaderboardProps) {
+export function HostLeaderboard({ data, pageSize = 10 }: HostLeaderboardProps) {
   const rankedData = useMemo(
     () => data.map((row, i) => ({ ...row, rank: i + 1 })),
     [data],
@@ -46,7 +47,7 @@ export function HostLeaderboard({ data }: HostLeaderboardProps) {
 
   return (
     <BrutalCard title="Host Leaderboard" className="h-full">
-      <BrutalDataTable data={rankedData} columns={columns} pageSize={10} />
+      <BrutalDataTable data={rankedData} columns={columns} pageSize={pageSize} />
     </BrutalCard>
   );
 }
