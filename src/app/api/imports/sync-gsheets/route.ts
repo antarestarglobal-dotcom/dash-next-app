@@ -3,8 +3,10 @@ import { createImportPreview } from "@/server/imports/import-service";
 import { ImportPreviewResponseSchema } from "@/lib/validators/import";
 import { apiSuccess, apiError } from "@/lib/validators/api";
 import { DomainError, getDomainErrorStatus, isDomainError } from "@/lib/errors/domain-error";
-import { logError, logInfo } from "@/lib/logger";
+import { logError, logInfo, logWarn } from "@/lib/logger";
 import { validateFileBuffer } from "@/lib/spreadsheet/parse-spreadsheet";
+import { fetchAllSheets } from "@/lib/gsheets/fetch-sheets-api";
+import { buildXlsxBuffer } from "@/lib/gsheets/build-xlsx-buffer";
 
 export const maxDuration = 60;
 
@@ -12,6 +14,64 @@ function extractSheetId(url: string): string | null {
   const match = url.match(/\/spreadsheets\/d\/([\w-]+)/);
   return match?.[1] ?? null;
 }
+
+// ─── Method A: Google Sheets API v4 (bypasses download restrictions) ──────────
+
+async function fetchBufferViaApi(sheetId: string, apiKey: string): Promise<Buffer> {
+  logInfo("sync-gsheets", `Using Sheets API v4 for ${sheetId}`);
+  const sheets = await fetchAllSheets(sheetId, apiKey);
+  if (sheets.length === 0) {
+    throw new DomainError("FETCH_ERROR", "Sheets API tidak mengembalikan data. Pastikan spreadsheet publik (Anyone with link = Viewer).");
+  }
+  logInfo("sync-gsheets", `API: ${sheets.length} sheet(s) fetched, building XLSX...`);
+  return buildXlsxBuffer(sheets);
+}
+
+// ─── Method B: XLSX export URL (requires download not restricted) ─────────────
+
+async function fetchBufferViaExport(sheetId: string): Promise<Buffer> {
+  logInfo("sync-gsheets", `Using XLSX export URL for ${sheetId}`);
+  const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
+
+  const res = await fetch(exportUrl, {
+    headers: {
+      "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*",
+    },
+    redirect: "follow",
+  });
+
+  if (res.status === 401 || res.status === 403) {
+    throw new DomainError(
+      "FETCH_ERROR",
+      `Google Sheets mengembalikan HTTP ${res.status}. File kemungkinan mengaktifkan "Prevent download for viewers". ` +
+      `Solusi: (1) Set GOOGLE_SHEETS_API_KEY di .env untuk bypass restriction, atau (2) minta owner matikan setting download restriction.`,
+    );
+  }
+  if (!res.ok) {
+    throw new DomainError("FETCH_ERROR", `Google Sheets HTTP ${res.status}. Pastikan file publik.`);
+  }
+
+  const finalUrl = res.url ?? "";
+  if (finalUrl.includes("accounts.google.com") || finalUrl.includes("ServiceLogin")) {
+    throw new DomainError(
+      "FETCH_ERROR",
+      "Google mengalihkan ke halaman login — download diblokir. Set GOOGLE_SHEETS_API_KEY di .env untuk bypass.",
+    );
+  }
+
+  const contentType = res.headers.get("content-type") ?? "";
+  if (contentType.includes("text/html")) {
+    throw new DomainError(
+      "FETCH_ERROR",
+      "Google mengembalikan HTML bukan XLSX — download diblokir. Set GOOGLE_SHEETS_API_KEY di .env untuk bypass.",
+    );
+  }
+
+  return Buffer.from(await res.arrayBuffer());
+}
+
+// ─── Route handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
   try {
@@ -27,81 +87,34 @@ export async function POST(req: NextRequest) {
       throw new DomainError("INVALID_URL", "URL Google Sheets tidak valid");
     }
 
-    const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
-    logInfo("POST /api/imports/sync-gsheets", `Fetching sheet ${sheetId}`);
+    const apiKey = process.env.GOOGLE_SHEETS_API_KEY;
 
-    const BROWSER_HEADERS = {
-      "User-Agent":
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-      Accept:
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*",
-    };
+    let buffer: Buffer;
 
-    let gResponse: Response;
-    try {
-      gResponse = await fetch(exportUrl, { headers: BROWSER_HEADERS, redirect: "follow" });
-    } catch {
-      throw new DomainError(
-        "FETCH_ERROR",
-        "Gagal mengunduh Google Sheets. Periksa koneksi server dan pastikan spreadsheet bisa diakses publik.",
-      );
+    if (apiKey) {
+      // Preferred: use Sheets API v4 — works even with download restrictions
+      buffer = await fetchBufferViaApi(sheetId, apiKey);
+    } else {
+      // Fallback: XLSX export URL — requires download not restricted
+      logWarn("sync-gsheets", "GOOGLE_SHEETS_API_KEY not set — falling back to export URL (may fail if download is restricted)");
+      buffer = await fetchBufferViaExport(sheetId);
     }
 
-    if (gResponse.status === 401 || gResponse.status === 403) {
-      throw new DomainError(
-        "FETCH_ERROR",
-        `Google Sheets mengembalikan HTTP ${gResponse.status}. Pastikan: (1) Share → General access = "Anyone with the link (Viewer)", (2) setting file "Viewers and commenters can see the option to download, print, and copy" dalam keadaan ON, dan (3) tidak dibatasi policy Google Workspace/domain.`,
-      );
-    }
-
-    if (!gResponse.ok) {
-      throw new DomainError(
-        "FETCH_ERROR",
-        `Google Sheets mengembalikan HTTP ${gResponse.status}. Pastikan file publik dan bisa diunduh oleh viewer (download/copy tidak diblok).`,
-      );
-    }
-
-    const finalUrl = gResponse.url ?? "";
-    if (finalUrl.includes("accounts.google.com") || finalUrl.includes("ServiceLogin")) {
-      throw new DomainError(
-        "FETCH_ERROR",
-        'Google mengalihkan ke halaman login. Biasanya ini terjadi karena file belum publik untuk download, opsi download/copy dimatikan, atau policy domain memblokir akses anonim.',
-      );
-    }
-
-    const contentType = gResponse.headers.get("content-type") ?? "";
-    if (contentType.includes("text/html") || contentType.includes("text/plain")) {
-      throw new DomainError(
-        "FETCH_ERROR",
-        'Google tidak mengembalikan file XLSX (mendapat HTML/text). Biasanya file dialihkan ke login/permission page. Cek setting share + download/copy permission.',
-      );
-    }
-
-    const buffer = Buffer.from(await gResponse.arrayBuffer());
     const fileValidation = validateFileBuffer(buffer, `gsheets-${sheetId}.xlsx`);
     if (!fileValidation.ok) {
-      throw new DomainError(
-        "FETCH_ERROR",
-        `${fileValidation.error}. Pastikan link Google Sheets bisa diakses publik (Viewer).`,
-      );
+      throw new DomainError("FETCH_ERROR", `File tidak valid: ${fileValidation.error}`);
     }
 
-    logInfo(
-      "POST /api/imports/sync-gsheets",
-      `Downloaded ${(buffer.length / 1024).toFixed(1)} KB, parsing...`,
-    );
+    logInfo("sync-gsheets", `Buffer ${(buffer.length / 1024).toFixed(1)} KB — parsing...`);
 
     const results = await createImportPreview(buffer, `gsheets-${sheetId}.xlsx`);
 
     if (results.length === 0) {
-      throw new DomainError(
-        "NO_SHEET_RECOGNIZED",
-        "Tidak ada sheet yang dikenali dari spreadsheet ini",
-      );
+      throw new DomainError("NO_SHEET_RECOGNIZED", "Tidak ada sheet yang dikenali dari spreadsheet ini");
     }
 
     const parsed = ImportPreviewResponseSchema.parse(results);
-    logInfo("POST /api/imports/sync-gsheets", `Done — ${parsed.length} sheet(s) recognized`);
+    logInfo("sync-gsheets", `Done — ${parsed.length} sheet(s) recognized`);
     return NextResponse.json(apiSuccess(parsed));
   } catch (err) {
     logError("POST /api/imports/sync-gsheets", err);
