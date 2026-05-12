@@ -15,7 +15,8 @@
     "test:coverage": "vitest run --coverage",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:studio": "drizzle-kit studio"
+    "db:studio": "drizzle-kit studio",
+    "db:clear": "tsx src/db/clear.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",  
