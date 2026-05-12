@@ -34,7 +34,13 @@ function useActiveRoute() {
 
 // ─── Shared nav items ────────────────────────────────────────────────────────
 
-function NavItems({ collapsed }: { collapsed: boolean }) {
+function NavItems({
+  collapsed,
+  onNavigate,
+}: {
+  collapsed: boolean;
+  onNavigate?: () => void;
+}) {
   const isActive = useActiveRoute();
 
   return (
@@ -45,6 +51,7 @@ function NavItems({ collapsed }: { collapsed: boolean }) {
           <Link
             key={href}
             href={href}
+            onClick={onNavigate}
             title={collapsed ? label : undefined}
             className={[
               "group flex items-center gap-3 px-3 py-2.5 text-sm font-semibold",
@@ -113,12 +120,6 @@ function SidebarFooter({ collapsed }: { collapsed: boolean }) {
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const pathname = usePathname();
-
-  // Close drawer on navigation
-  useEffect(() => {
-    setDrawerOpen(false);
-  }, [pathname]);
 
   // Close drawer on wide viewport resize
   useEffect(() => {
@@ -176,7 +177,7 @@ export function Sidebar() {
             <X className="w-4 h-4" />
           </button>
         </div>
-        <NavItems collapsed={false} />
+        <NavItems collapsed={false} onNavigate={() => setDrawerOpen(false)} />
         <SidebarFooter collapsed={false} />
       </aside>
 

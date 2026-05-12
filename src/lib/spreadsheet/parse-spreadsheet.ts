@@ -14,7 +14,7 @@ import { parseMarketingCosts, type MarketingCostsParseResult } from "./parsers/m
 import { parseStockSnapshot, type StockSnapshotParseResult } from "./parsers/stock-snapshot-parser";
 import { parseSalesTargets, type SalesTargetsParseResult } from "./parsers/sales-targets-parser";
 import { parseDailyPerformance, type DailyPerformanceParseResult } from "./parsers/daily-performance-parser";
-import type { ParsedTemplateType, TemplateType } from "@/lib/domain/import-domain";
+import type { ParsedTemplateType } from "@/lib/domain/import-domain";
 
 export interface ParsedResultByTemplate {
   cohort_hourly: CohortParseResult;
@@ -222,32 +222,6 @@ async function readAllSheets(
   }
   // XLS and CSV fall back to xlsx library (sync, wrapped in promise)
   return readSheetsWithXlsx(buffer, limit);
-}
-
-// ─── Template dispatch ────────────────────────────────────────────────────────
-
-function parseRows(
-  rows: unknown[][],
-  templateType: TemplateType,
-  isPreview: boolean,
-): Record<string, unknown> {
-  switch (templateType) {
-    case "cohort_hourly":
-      return parseCohortHourly(rows) as unknown as Record<string, unknown>;
-    case "host_gmv":
-      return parseHostGmv(rows) as unknown as Record<string, unknown>;
-    case "order_detail":
-      return parseOrderDetail(rows, isPreview, isPreview ? 50 : undefined) as unknown as Record<
-        string,
-        unknown
-      >;
-    case "master_product":
-      return parseMasterProduct(rows) as unknown as Record<string, unknown>;
-    case "host_okr":
-      return parseHostOkr(rows) as unknown as Record<string, unknown>;
-    default:
-      throw new Error(`Template type "${templateType}" tidak didukung`);
-  }
 }
 
 // ─── Public API ───────────────────────────────────────────────────────────────

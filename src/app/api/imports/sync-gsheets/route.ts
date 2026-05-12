@@ -4,6 +4,7 @@ import { ImportPreviewResponseSchema } from "@/lib/validators/import";
 import { apiSuccess, apiError } from "@/lib/validators/api";
 import { DomainError, getDomainErrorStatus, isDomainError } from "@/lib/errors/domain-error";
 import { logError, logInfo } from "@/lib/logger";
+import { validateFileBuffer } from "@/lib/spreadsheet/parse-spreadsheet";
 
 export const maxDuration = 60;
 
@@ -60,8 +61,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const finalUrl = gResponse.url ?? "";
+    if (finalUrl.includes("accounts.google.com") || finalUrl.includes("ServiceLogin")) {
+      throw new DomainError(
+        "FETCH_ERROR",
+        'Google mengalihkan ke halaman login. Buka spreadsheet → Share → General access → pilih "Anyone with the link" = Viewer, lalu coba lagi.',
+      );
+    }
+
     const contentType = gResponse.headers.get("content-type") ?? "";
-    if (contentType.includes("text/html")) {
+    if (contentType.includes("text/html") || contentType.includes("text/plain")) {
       throw new DomainError(
         "FETCH_ERROR",
         'Google mengalihkan ke halaman login. Buka spreadsheet → Share → General access → pilih "Anyone with the link" = Viewer, lalu coba lagi.',
@@ -69,6 +78,14 @@ export async function POST(req: NextRequest) {
     }
 
     const buffer = Buffer.from(await gResponse.arrayBuffer());
+    const fileValidation = validateFileBuffer(buffer, `gsheets-${sheetId}.xlsx`);
+    if (!fileValidation.ok) {
+      throw new DomainError(
+        "FETCH_ERROR",
+        `${fileValidation.error}. Pastikan link Google Sheets bisa diakses publik (Viewer).`,
+      );
+    }
+
     logInfo(
       "POST /api/imports/sync-gsheets",
       `Downloaded ${(buffer.length / 1024).toFixed(1)} KB, parsing...`,

@@ -301,7 +301,7 @@ export function DailyTrendChart({ data }: DailyTrendChartProps) {
               cursor={{ fill: "#f5f5f5" }}
             />
             <Bar dataKey="avg" stroke="#171717" strokeWidth={2} radius={0}>
-              {weekdayData.map((entry, index) => (
+              {weekdayData.map((entry) => (
                 <Cell
                   key={entry.day}
                   fill={entry.avg === maxWeekdayAvg ? "#171717" : "#e5e5e5"}

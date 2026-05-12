@@ -25,7 +25,6 @@ const rand = (): number => {
 };
 const randInt = (min: number, max: number) => Math.floor(rand() * (max - min + 1)) + min;
 const randFloat = (min: number, max: number) => min + rand() * (max - min);
-const pick = <T>(arr: readonly T[]): T => arr[Math.floor(rand() * arr.length)];
 
 // ─── Date helpers ─────────────────────────────────────────────────────────────
 
@@ -40,7 +39,6 @@ const dateRange = (start: string, end: string): string[] => {
   return dates;
 };
 
-const toPeriod = (date: string) => date.slice(0, 7);
 const addDays = (date: string, n: number): string => {
   const d = new Date(date + "T00:00:00Z");
   d.setUTCDate(d.getUTCDate() + n);
@@ -87,8 +85,6 @@ const PRODUCTS: { category: string; productName: string; sku: string; hpp: numbe
   { category: "Bundle",   productName: "Antarestar Haircare Complete Set",     sku: "ANT-BDL-002", hpp: 95000,  hargaJual: 249000 },
   { category: "Bundle",   productName: "Antarestar Brightening Paket Hemat",   sku: "ANT-BDL-003", hpp: 140000, hargaJual: 349000 },
 ];
-
-const MARKETING_CHANNELS = ["voucher", "affiliate", "sample", "endorse", "iklan", "other"] as const;
 
 // ─── Seasonal multiplier ──────────────────────────────────────────────────────
 
