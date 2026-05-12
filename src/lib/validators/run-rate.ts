@@ -170,6 +170,52 @@ export const StoresResponseSchema = z.array(StoreSchema);
 export const BrandsResponseSchema = z.array(BrandSchema);
 export const PlatformContributionResponseSchema = z.array(PlatformContributionSchema);
 
+export const LegacyRunrateProductSchema = z.object({
+  name: z.string().min(1),
+  units: z.coerce.number(),
+  gross: z.coerce.number(),
+  margin: z.coerce.number(),
+  aov: z.coerce.number(),
+  marginPct: z.coerce.number(),
+  marketingCost: z.coerce.number(),
+  marketingPct: z.coerce.number(),
+  netProfit: z.coerce.number(),
+  npm: z.coerce.number(),
+  contribSales: z.coerce.number(),
+  contribProfit: z.coerce.number(),
+  cls: z.string().min(1),
+  classTxt: z.string().optional(),
+});
+
+export const LegacyRunrateResponseSchema = z.object({
+  success: z.literal(true),
+  month: z.string().min(1),
+  progress: z.coerce.number(),
+  products: z.array(LegacyRunrateProductSchema),
+});
+
+export const LegacyFunnelProductSchema = z.object({
+  name: z.string().min(1),
+  impressions: z.coerce.number(),
+  ctr: z.coerce.number(),
+  clicks: z.coerce.number(),
+  cr: z.coerce.number(),
+  orders: z.coerce.number(),
+  halamanImp: z.coerce.number(),
+  halamanCtr: z.coerce.number(),
+  halamanClicks: z.coerce.number(),
+  halamanCr: z.coerce.number(),
+  halamanOrders: z.coerce.number(),
+  ctor: z.coerce.number(),
+  contribution: z.coerce.number(),
+});
+
+export const LegacyFunnelResponseSchema = z.object({
+  success: z.literal(true),
+  period: z.string().min(1),
+  funnelProduk: z.array(LegacyFunnelProductSchema),
+});
+
 export type Period = z.infer<typeof PeriodSchema>;
 export type Klasifikasi = z.infer<typeof KlasifikasiSchema>;
 export type MarketingChannel = z.infer<typeof MarketingChannelSchema>;
@@ -188,3 +234,7 @@ export type MoMMetric = z.infer<typeof MoMMetricSchema>;
 export type Store = z.infer<typeof StoreSchema>;
 export type Brand = z.infer<typeof BrandSchema>;
 export type PlatformContribution = z.infer<typeof PlatformContributionSchema>;
+export type LegacyRunrateProduct = z.infer<typeof LegacyRunrateProductSchema>;
+export type LegacyRunrateResponse = z.infer<typeof LegacyRunrateResponseSchema>;
+export type LegacyFunnelProduct = z.infer<typeof LegacyFunnelProductSchema>;
+export type LegacyFunnelResponse = z.infer<typeof LegacyFunnelResponseSchema>;

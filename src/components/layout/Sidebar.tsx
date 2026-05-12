@@ -5,7 +5,6 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
-  BarChart3,
   Upload,
   Clock,
   ChevronLeft,
@@ -15,8 +14,7 @@ import {
 } from "lucide-react";
 
 const NAV = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/run-rate", label: "Run Rate", icon: BarChart3 },
+  { href: "/global", label: "Global", icon: LayoutDashboard },
   { href: "/imports", label: "Import Data", icon: Upload },
   { href: "/imports/history", label: "Riwayat Import", icon: Clock },
 ] as const;
