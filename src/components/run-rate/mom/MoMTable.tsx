@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import React, { useMemo } from "react";
 import { BrutalCard } from "@/components/ui/BrutalCard";
 import { formatPct, formatRpCompact, formatShortDate } from "@/lib/format";
 import type { MoMMetric } from "@/lib/validators/run-rate";
@@ -47,11 +47,11 @@ export const MoMTable = ({ rows }: Props) => {
             <tr className="border-b border-neutral-200 bg-stone-50 text-[10px] text-neutral-500">
               <th className="px-3 py-1 sticky left-0 bg-stone-50" />
               {months.map((m) => (
-                <>
-                  <th key={`${m}-ns`} className="text-right px-3 py-1 border-l border-neutral-200">Sales</th>
-                  <th key={`${m}-npm`} className="text-right px-3 py-1">NPM</th>
-                  <th key={`${m}-ch`} className="text-right px-3 py-1">Chance</th>
-                </>
+                <React.Fragment key={m}>
+                  <th className="text-right px-3 py-1 border-l border-neutral-200">Sales</th>
+                  <th className="text-right px-3 py-1">NPM</th>
+                  <th className="text-right px-3 py-1">Chance</th>
+                </React.Fragment>
               ))}
             </tr>
           </thead>
@@ -67,14 +67,14 @@ export const MoMTable = ({ rows }: Props) => {
                   {months.map((m) => {
                     const row = lookup.get(`${m}|${day}`);
                     return (
-                      <>
-                        <td key={`${m}-ns`} className="px-3 py-2 text-right border-l border-neutral-100 font-bold">
+                      <React.Fragment key={m}>
+                        <td className="px-3 py-2 text-right border-l border-neutral-100 font-bold">
                           {row ? formatRpCompact(row.netSales) : <span className="text-neutral-300">—</span>}
                         </td>
-                        <td key={`${m}-npm`} className="px-3 py-2 text-right">
+                        <td className="px-3 py-2 text-right">
                           {row ? formatPct(row.npm, 1) : <span className="text-neutral-300">—</span>}
                         </td>
-                        <td key={`${m}-ch`} className="px-3 py-2 text-right">
+                        <td className="px-3 py-2 text-right">
                           {row ? (
                             <span className={row.chance >= 0 ? "text-green-700 font-bold" : "text-red-700 font-bold"}>
                               {row.chance >= 0 ? "+" : ""}{formatPct(row.chance, 1)}
@@ -83,7 +83,7 @@ export const MoMTable = ({ rows }: Props) => {
                             <span className="text-neutral-300">—</span>
                           )}
                         </td>
-                      </>
+                      </React.Fragment>
                     );
                   })}
                 </tr>

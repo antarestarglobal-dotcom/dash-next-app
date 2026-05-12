@@ -1,9 +1,7 @@
 import { db } from "@/db";
 import {
   brands,
-  dailyStorePerformance,
   marketingCosts,
-  products,
   salesLineItems,
   salesTargets,
   stockSnapshots,
@@ -62,16 +60,6 @@ const previousPeriod = (period: string): string => {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
 };
 
-const buildDailyConditions = (filter: RunRateFilter): SQL[] => {
-  const range = toDateRange(filter);
-  return [
-    filter.storeId ? eq(dailyStorePerformance.storeId, filter.storeId) : undefined,
-    filter.brandId ? eq(dailyStorePerformance.brandId, filter.brandId) : undefined,
-    range.startDate ? gte(dailyStorePerformance.date, range.startDate) : undefined,
-    range.endDate ? lte(dailyStorePerformance.date, range.endDate) : undefined,
-  ].filter((condition): condition is SQL => condition !== undefined);
-};
-
 const buildSalesConditions = (filter: RunRateFilter): SQL[] => {
   const range = toDateRange(filter);
   return [
@@ -95,12 +83,11 @@ const buildMarketingConditions = (filter: MarketingFilter): SQL[] => {
 
 const orderProductBy = (filter: ProductFilter): SQL => {
   const direction = filter.order === "asc" ? asc : desc;
-  const expression = filter.sortBy === "netProfit"
-    ? sql`sum(${salesLineItems.netProfit})`
-    : filter.sortBy === "npm"
-      ? sql`case when sum(${salesLineItems.netSales}) = 0 then 0 else sum(${salesLineItems.netProfit}) / sum(${salesLineItems.netSales}) end`
-      : filter.sortBy === "contributionSales"
-        ? sql`sum(${salesLineItems.netSales})`
+  const expression =
+    filter.sortBy === "netProfit"
+      ? sql`sum(${salesLineItems.netProfit})`
+      : filter.sortBy === "npm"
+        ? sql`case when sum(${salesLineItems.netSales}) = 0 then 0 else sum(${salesLineItems.netProfit}) / sum(${salesLineItems.netSales}) end`
         : sql`sum(${salesLineItems.netSales})`;
   return direction(expression);
 };
@@ -122,39 +109,55 @@ export const getBrands = async () => {
 };
 
 export const getPlatformContribution = async (filter: RunRateFilter) => {
-  const conditions = buildDailyConditions(filter);
+  const conditions = buildSalesConditions(filter);
   const rows = await db
     .select({
       storeId: stores.id,
       storeName: stores.name,
-      netSales: sql<string>`coalesce(sum(${dailyStorePerformance.netSales}), 0)`,
+      netSales: sql<string>`coalesce(sum(${salesLineItems.netSales}), 0)`,
     })
-    .from(dailyStorePerformance)
-    .innerJoin(stores, eq(dailyStorePerformance.storeId, stores.id))
+    .from(salesLineItems)
+    .innerJoin(stores, eq(salesLineItems.storeId, stores.id))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .groupBy(stores.id, stores.name)
-    .orderBy(desc(sql`sum(${dailyStorePerformance.netSales})`));
+    .orderBy(desc(sql`sum(${salesLineItems.netSales})`));
   return PlatformContributionResponseSchema.parse(rows);
 };
 
-const getSummaryAggregate = async (filter: RunRateFilter) => {
-  const conditions = buildDailyConditions(filter);
+const getSalesAggregate = async (filter: RunRateFilter) => {
+  const conditions = buildSalesConditions(filter);
   const [row] = await db
     .select({
-      netSales: sql<string>`coalesce(sum(${dailyStorePerformance.netSales}), 0)`,
-      netProfit: sql<string>`coalesce(sum(${dailyStorePerformance.netProfit}), 0)`,
-      margin: sql<string>`coalesce(sum(${dailyStorePerformance.margin}), 0)`,
-      marketingCost: sql<string>`coalesce(sum(${dailyStorePerformance.marketingCost}), 0)`,
-      gmv: sql<string>`coalesce(sum(${dailyStorePerformance.gmv}), 0)`,
+      netSales: sql<string>`coalesce(sum(${salesLineItems.netSales}), 0)`,
+      salesProfit: sql<string>`coalesce(sum(${salesLineItems.netProfit}), 0)`,
+      margin: sql<string>`coalesce(sum(${salesLineItems.marginRp}), 0)`,
     })
-    .from(dailyStorePerformance)
+    .from(salesLineItems)
     .where(conditions.length > 0 ? and(...conditions) : undefined);
   return {
     netSales: toNumber(row?.netSales),
-    netProfit: toNumber(row?.netProfit),
+    salesProfit: toNumber(row?.salesProfit),
     margin: toNumber(row?.margin),
-    marketingCost: toNumber(row?.marketingCost),
-    gmv: toNumber(row?.gmv),
+  };
+};
+
+const getMarketingTotal = async (filter: RunRateFilter): Promise<number> => {
+  const mktConditions = buildMarketingConditions(filter);
+  const [row] = await db
+    .select({ total: sql<string>`coalesce(sum(${marketingCosts.totalCost}), 0)` })
+    .from(marketingCosts)
+    .where(mktConditions.length > 0 ? and(...mktConditions) : undefined);
+  return toNumber(row?.total);
+};
+
+const getSummaryAggregate = async (filter: RunRateFilter) => {
+  const [sales, mktCost] = await Promise.all([getSalesAggregate(filter), getMarketingTotal(filter)]);
+  return {
+    netSales: sales.netSales,
+    netProfit: sales.salesProfit - mktCost,
+    margin: sales.margin,
+    marketingCost: mktCost,
+    gmv: sales.netSales,
   };
 };
 
@@ -175,31 +178,44 @@ export const getRunRateSummary = async (filter: RunRateFilter) => {
     vsLastMonth: {
       netSales: calculateRatio(current.netSales - last.netSales, last.netSales),
       netProfit: calculateRatio(current.netProfit - last.netProfit, last.netProfit),
-      npm: calculateRatio(current.netProfit, current.netSales) - calculateRatio(last.netProfit, last.netSales),
+      npm:
+        calculateRatio(current.netProfit, current.netSales) -
+        calculateRatio(last.netProfit, last.netSales),
     },
   });
 };
 
 export const getDailyPerformance = async (filter: RunRateFilter) => {
-  const conditions = buildDailyConditions(filter);
-  const rows = await db
-    .select({
-      date: dailyStorePerformance.date,
-      netSales: sql<string>`coalesce(sum(${dailyStorePerformance.netSales}), 0)`,
-      netProfit: sql<string>`coalesce(sum(${dailyStorePerformance.netProfit}), 0)`,
-      marketingCost: sql<string>`coalesce(sum(${dailyStorePerformance.marketingCost}), 0)`,
-      gmv: sql<string>`coalesce(sum(${dailyStorePerformance.gmv}), 0)`,
-      liveGmv: sql<string>`coalesce(sum(${dailyStorePerformance.liveGmv}), 0)`,
-    })
-    .from(dailyStorePerformance)
-    .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .groupBy(dailyStorePerformance.date)
-    .orderBy(asc(dailyStorePerformance.date));
+  const salesConditions = buildSalesConditions(filter);
+  const mktConditions = buildMarketingConditions(filter);
+  const [salesRows, mktRows] = await Promise.all([
+    db
+      .select({
+        date: salesLineItems.date,
+        netSales: sql<string>`coalesce(sum(${salesLineItems.netSales}), 0)`,
+        netProfit: sql<string>`coalesce(sum(${salesLineItems.netProfit}), 0)`,
+      })
+      .from(salesLineItems)
+      .where(salesConditions.length > 0 ? and(...salesConditions) : undefined)
+      .groupBy(salesLineItems.date)
+      .orderBy(asc(salesLineItems.date)),
+    db
+      .select({
+        date: marketingCosts.date,
+        totalCost: sql<string>`coalesce(sum(${marketingCosts.totalCost}), 0)`,
+      })
+      .from(marketingCosts)
+      .where(mktConditions.length > 0 ? and(...mktConditions) : undefined)
+      .groupBy(marketingCosts.date),
+  ]);
+  const mktByDate = new Map(mktRows.map((r) => [r.date, toNumber(r.totalCost)]));
   return DailyResponseSchema.parse(
-    rows.map((row) => {
+    salesRows.map((row) => {
       const netSales = toNumber(row.netSales);
-      const netProfit = toNumber(row.netProfit);
-      return { ...row, netSales, netProfit, npm: calculateRatio(netProfit, netSales), marketingCost: toNumber(row.marketingCost), gmv: toNumber(row.gmv), liveGmv: toNumber(row.liveGmv) };
+      const salesProfit = toNumber(row.netProfit);
+      const marketingCost = mktByDate.get(row.date) ?? 0;
+      const netProfit = salesProfit - marketingCost;
+      return { date: row.date, netSales, netProfit, npm: calculateRatio(netProfit, netSales), marketingCost, gmv: netSales, liveGmv: 0 };
     }),
   );
 };
@@ -208,36 +224,34 @@ export const getProductPerformance = async (filter: ProductFilter) => {
   const conditions = buildSalesConditions(filter);
   const rows = await db
     .select({
-      productId: products.id,
-      productName: products.productName,
+      sku: salesLineItems.sku,
+      productName: salesLineItems.productName,
       invoiceCount: sql<number>`count(*)`,
       netSales: sql<string>`coalesce(sum(${salesLineItems.netSales}), 0)`,
       margin: sql<string>`coalesce(sum(${salesLineItems.marginRp}), 0)`,
-      qty: sql<string>`coalesce(sum(${salesLineItems.qty}), 0)`,
       netProfit: sql<string>`coalesce(sum(${salesLineItems.netProfit}), 0)`,
       stok: sql<number | null>`max(${stockSnapshots.totalQty})`,
       estimasiHabisHari: sql<string | null>`max(${stockSnapshots.limit0Days})`,
     })
     .from(salesLineItems)
-    .innerJoin(products, eq(salesLineItems.productId, products.id))
     .leftJoin(stockSnapshots, eq(salesLineItems.sku, stockSnapshots.sku))
     .where(conditions.length > 0 ? and(...conditions) : undefined)
-    .groupBy(products.id, products.productName)
+    .groupBy(salesLineItems.sku, salesLineItems.productName)
     .orderBy(orderProductBy(filter))
     .limit(200);
   const totalSales = rows.reduce((sum, row) => sum + toNumber(row.netSales), 0);
   const totalProfit = rows.reduce((sum, row) => sum + toNumber(row.netProfit), 0);
   const classified = classifyAll(
-    rows.map((row) => {
+    rows.map((row, index) => {
       const netSales = toNumber(row.netSales);
       const netProfit = toNumber(row.netProfit);
       return {
-        productId: row.productId,
+        productId: index + 1,
         productName: row.productName,
         invoiceCount: Number(row.invoiceCount),
         netSales,
         margin: toNumber(row.margin),
-        aov: calculateRatio(netSales, Number(row.invoiceCount)) / 100,
+        aov: Number(row.invoiceCount) > 0 ? netSales / Number(row.invoiceCount) : 0,
         npm: calculateRatio(netProfit, netSales),
         contributionSales: calculateRatio(netSales, totalSales),
         contributionProfit: calculateRatio(netProfit, totalProfit),
@@ -270,7 +284,11 @@ export const getProductPerformance = async (filter: ProductFilter) => {
 export const getMarketingBreakdown = async (filter: MarketingFilter) => {
   const conditions = buildMarketingConditions(filter);
   const daily = await db
-    .select({ date: marketingCosts.date, variable: marketingCosts.variable, totalCost: sql<string>`coalesce(sum(${marketingCosts.totalCost}), 0)` })
+    .select({
+      date: marketingCosts.date,
+      variable: marketingCosts.variable,
+      totalCost: sql<string>`coalesce(sum(${marketingCosts.totalCost}), 0)`,
+    })
     .from(marketingCosts)
     .where(conditions.length > 0 ? and(...conditions) : undefined)
     .groupBy(marketingCosts.date, marketingCosts.variable)
@@ -296,10 +314,15 @@ export const getTargetProgress = async (filter: RunRateFilter) => {
     filter.brandId ? eq(salesTargets.brandId, filter.brandId) : undefined,
   ].filter((condition): condition is SQL => condition !== undefined);
   const [targets, actual] = await Promise.all([
-    db.select({ type: salesTargets.type, total: sql<string>`coalesce(sum(${salesTargets.nominal}), 0)` }).from(salesTargets).where(and(...conditions)).groupBy(salesTargets.type),
+    db
+      .select({ type: salesTargets.type, total: sql<string>`coalesce(sum(${salesTargets.nominal}), 0)` })
+      .from(salesTargets)
+      .where(and(...conditions))
+      .groupBy(salesTargets.type),
     getSummaryAggregate(filter),
   ]);
-  const targetByType = (type: string): number => toNumber(targets.find((target) => target.type === type)?.total);
+  const targetByType = (type: string): number =>
+    toNumber(targets.find((target) => target.type === type)?.total);
   const netSalesTarget = targetByType("net_sales");
   const marketingTarget = targetByType("marketing_cost");
   const netProfitTarget = targetByType("net_profit");
@@ -317,11 +340,12 @@ export const getStockStatus = async (filter: StockFilter) => {
     filter.minDays !== undefined ? gte(stockSnapshots.limit0Days, String(filter.minDays)) : undefined,
     filter.maxDays !== undefined ? lte(stockSnapshots.limit0Days, String(filter.maxDays)) : undefined,
   ].filter((condition): condition is SQL => condition !== undefined);
-  const orderBy = filter.sortBy === "total_qty"
-    ? asc(stockSnapshots.totalQty)
-    : filter.sortBy === "average_out"
-      ? desc(stockSnapshots.averageOut)
-      : asc(stockSnapshots.limit0Days);
+  const orderBy =
+    filter.sortBy === "total_qty"
+      ? asc(stockSnapshots.totalQty)
+      : filter.sortBy === "average_out"
+        ? desc(stockSnapshots.averageOut)
+        : asc(stockSnapshots.limit0Days);
   const rows = await db
     .select({
       productName: stockSnapshots.productName,
@@ -340,29 +364,37 @@ export const getStockStatus = async (filter: StockFilter) => {
 };
 
 export const getMoMComparison = async (months: readonly string[], storeId?: number) => {
-  const conditions = [
-    inArray(sql<string>`to_char(${dailyStorePerformance.date}, 'YYYY-MM')`, [...months]),
-    storeId ? eq(dailyStorePerformance.storeId, storeId) : undefined,
+  const salesConditions = [
+    inArray(sql<string>`to_char(${salesLineItems.date}::date, 'YYYY-MM')`, [...months]),
+    storeId ? eq(salesLineItems.storeId, storeId) : undefined,
   ].filter((condition): condition is SQL => condition !== undefined);
   const rows = await db
     .select({
-      month: sql<string>`to_char(${dailyStorePerformance.date}, 'YYYY-MM')`,
-      date: dailyStorePerformance.date,
-      dayOfMonth: sql<number>`extract(day from ${dailyStorePerformance.date})`,
-      netSales: sql<string>`coalesce(sum(${dailyStorePerformance.netSales}), 0)`,
-      netProfit: sql<string>`coalesce(sum(${dailyStorePerformance.netProfit}), 0)`,
+      month: sql<string>`to_char(${salesLineItems.date}::date, 'YYYY-MM')`,
+      date: salesLineItems.date,
+      dayOfMonth: sql<number>`extract(day from ${salesLineItems.date}::date)`,
+      netSales: sql<string>`coalesce(sum(${salesLineItems.netSales}), 0)`,
+      netProfit: sql<string>`coalesce(sum(${salesLineItems.netProfit}), 0)`,
     })
-    .from(dailyStorePerformance)
-    .where(and(...conditions))
-    .groupBy(sql`to_char(${dailyStorePerformance.date}, 'YYYY-MM')`, dailyStorePerformance.date)
-    .orderBy(asc(dailyStorePerformance.date));
+    .from(salesLineItems)
+    .where(and(...salesConditions))
+    .groupBy(sql`to_char(${salesLineItems.date}::date, 'YYYY-MM')`, salesLineItems.date)
+    .orderBy(asc(salesLineItems.date));
   const previousByDay = new Map<string, number>();
   const mapped = rows.map((row) => {
     const previous = previousByDay.get(String(row.dayOfMonth)) ?? 0;
     const netSales = toNumber(row.netSales);
     previousByDay.set(String(row.dayOfMonth), netSales);
     const netProfit = toNumber(row.netProfit);
-    return { month: row.month, date: row.date.slice(0, DATE_LENGTH), dayOfMonth: Number(row.dayOfMonth), netSales, netProfit, npm: calculateRatio(netProfit, netSales), chance: calculateRatio(netSales - previous, previous) };
+    return {
+      month: row.month,
+      date: row.date.slice(0, DATE_LENGTH),
+      dayOfMonth: Number(row.dayOfMonth),
+      netSales,
+      netProfit,
+      npm: calculateRatio(netProfit, netSales),
+      chance: calculateRatio(netSales - previous, previous),
+    };
   });
   return MoMResponseSchema.parse(mapped);
 };

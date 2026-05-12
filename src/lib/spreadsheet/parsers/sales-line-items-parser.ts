@@ -39,17 +39,18 @@ const toRawSalesRow = (row: readonly unknown[], columns: ReadonlyMap<string, num
   kategori: textCell(getCell(row, columns, ["kategori", "category"])) || null,
   produk: textCell(getCell(row, columns, ["produk", "product"])),
   sku: textCell(getCell(row, columns, ["sku"])),
-  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty"])) ?? 0),
-  hargaJual: parseIndonesianNumber(getCell(row, columns, ["harga jual"])) ?? 0,
-  hpp: parseIndonesianNumber(getCell(row, columns, ["hpp"])) ?? 0,
-  marginRp: parseIndonesianNumber(getCell(row, columns, ["margin rp"])) ?? 0,
+  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty", "quantity"])) ?? 0),
+  hargaJual: parseIndonesianNumber(getCell(row, columns, ["harga jual", "price"])) ?? 0,
+  hpp: parseIndonesianNumber(getCell(row, columns, ["hpp", "cogs", "cost of goods"])) ?? 0,
+  marginRp: parseIndonesianNumber(getCell(row, columns, ["margin rp", "profit", "gross profit"])) ?? 0,
   marginPct: parseIndonesianPercent(getCell(row, columns, ["margin %", "margin"])) ?? 0,
-  netSales: parseIndonesianNumber(getCell(row, columns, ["net sales"])) ?? 0,
+  netSales: parseIndonesianNumber(getCell(row, columns, ["net sales", "revenue"])) ?? 0,
   netProfit: parseIndonesianNumber(getCell(row, columns, ["net profit"])) ?? 0,
 });
 
 export const parseSalesLineItems = (rows: readonly unknown[][]): SalesLineItemsParseResult => {
-  const headerIndex = findHeaderRow(rows, ["tanggal", "platform", "sku", "qty"]);
+  let headerIndex = findHeaderRow(rows, ["tanggal", "platform", "sku", "qty"]);
+  if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["date", "platform", "sku"]);
   if (headerIndex < 0) {
     return { templateType: "sales_line_items", summary: { totalRows: 0, validRows: 0, rejectedRowsCount: 0 }, rows: [], warnings: ["Header Sales tidak ditemukan"], rejectedRows: [] };
   }

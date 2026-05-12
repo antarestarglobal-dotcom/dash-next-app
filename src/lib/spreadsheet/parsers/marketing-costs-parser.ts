@@ -47,14 +47,14 @@ const nullableText = (value: unknown): string | null => textCell(value) || null;
 
 const toRawMarketingRow = (row: readonly unknown[], columns: ReadonlyMap<string, number>) => ({
   date: parseAnyDate(getCell(row, columns, ["tanggal", "date"])),
-  variable: detectVariable(getCell(row, columns, ["variable"])),
+  variable: detectVariable(getCell(row, columns, ["variable", "voucher type", "affiliate type", "metric type"])),
   platform: nullableText(getCell(row, columns, ["platform"])),
-  storeOrBrand: nullableText(getCell(row, columns, ["store brand", "store", "brand"])),
+  storeOrBrand: nullableText(getCell(row, columns, ["store brand", "store name", "store", "brand"])),
   kategori: nullableText(getCell(row, columns, ["kategori", "category"])),
-  produk: nullableText(getCell(row, columns, ["produk", "product"])),
+  produk: nullableText(getCell(row, columns, ["produk", "product", "product name"])),
   sku: nullableText(getCell(row, columns, ["sku"])),
   qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty"])) ?? 0) || null,
-  totalBiaya: parseIndonesianNumber(getCell(row, columns, ["total biaya"])) ?? 0,
+  totalBiaya: parseIndonesianNumber(getCell(row, columns, ["total biaya", "value", "total cost", "sales value", "gmv value"])) ?? 0,
   nilaiProduk: parseIndonesianNumber(getCell(row, columns, ["nilai produk"])),
   ongkosKirim: parseIndonesianNumber(getCell(row, columns, ["ongkos kirim"])),
   rateCard: parseIndonesianNumber(getCell(row, columns, ["rate card"])),
@@ -63,7 +63,11 @@ const toRawMarketingRow = (row: readonly unknown[], columns: ReadonlyMap<string,
 });
 
 export const parseMarketingCosts = (rows: readonly unknown[][]): MarketingCostsParseResult => {
-  const headerIndex = findHeaderRow(rows, ["tanggal", "variable", "total biaya"]);
+  let headerIndex = findHeaderRow(rows, ["tanggal", "variable", "total biaya"]);
+  if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["date", "voucher type"]);
+  if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["date", "affiliate type"]);
+  if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["date", "metric type"]);
+  if (headerIndex < 0) headerIndex = findHeaderRow(rows, ["date", "variable"]);
   if (headerIndex < 0) return { templateType: "marketing_costs", summary: { totalRows: 0, validRows: 0, rejectedRowsCount: 0 }, rows: [], warnings: ["Header marketing tidak ditemukan"], rejectedRows: [] };
   const columns = buildColumnMap(rows[headerIndex] ?? []);
   const parsed = nonEmptyDataRows(rows, headerIndex).map((row, index) => ({ row, index, parsed: MarketingCostRowSchema.safeParse(toRawMarketingRow(row, columns)) }));
