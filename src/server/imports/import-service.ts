@@ -231,5 +231,95 @@ function buildPreviewData(sheet: KnownSheetParseResult): PreviewDerivedData {
         metadata: {},
       };
     }
+    case "sales_line_items": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+      return {
+        period: parsed.rows[0]?.date.slice(0, 7) ?? null,
+        metric: "net_sales",
+        platform: parsed.rows[0]?.platform ?? null,
+        brand: parsed.rows[0]?.brand ?? null,
+        channel: null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.rows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
+    case "marketing_costs": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+      return {
+        period: parsed.rows[0]?.date.slice(0, 7) ?? null,
+        metric: "marketing_cost",
+        platform: parsed.rows[0]?.platform ?? null,
+        brand: parsed.rows[0]?.storeOrBrand ?? null,
+        channel: parsed.rows[0]?.variable ?? null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.rows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
+    case "stock_snapshot": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+      return {
+        period: null,
+        metric: "stock",
+        platform: null,
+        brand: null,
+        channel: null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.rows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
+    case "sales_targets": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+      return {
+        period: parsed.rows[0]?.period ?? null,
+        metric: "target",
+        platform: parsed.rows[0]?.platform ?? null,
+        brand: parsed.rows[0]?.brand ?? null,
+        channel: null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.rows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
+    case "daily_performance": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+      return {
+        period: parsed.rows[0]?.date.slice(0, 7) ?? null,
+        metric: "daily_performance",
+        platform: null,
+        brand: null,
+        channel: null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.rows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
   }
 }

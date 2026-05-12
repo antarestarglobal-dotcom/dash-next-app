@@ -9,6 +9,11 @@ import {
   type MasterProductParseResult,
 } from "./parsers/master-product-parser";
 import { parseHostOkr, type HostOkrParseResult } from "./parsers/host-okr-parser";
+import { parseSalesLineItems, type SalesLineItemsParseResult } from "./parsers/sales-line-items-parser";
+import { parseMarketingCosts, type MarketingCostsParseResult } from "./parsers/marketing-costs-parser";
+import { parseStockSnapshot, type StockSnapshotParseResult } from "./parsers/stock-snapshot-parser";
+import { parseSalesTargets, type SalesTargetsParseResult } from "./parsers/sales-targets-parser";
+import { parseDailyPerformance, type DailyPerformanceParseResult } from "./parsers/daily-performance-parser";
 import type { ParsedTemplateType, TemplateType } from "@/lib/domain/import-domain";
 
 export interface ParsedResultByTemplate {
@@ -17,6 +22,11 @@ export interface ParsedResultByTemplate {
   order_detail: OrderDetailParseResult;
   master_product: MasterProductParseResult;
   host_okr: HostOkrParseResult;
+  sales_line_items: SalesLineItemsParseResult;
+  marketing_costs: MarketingCostsParseResult;
+  stock_snapshot: StockSnapshotParseResult;
+  sales_targets: SalesTargetsParseResult;
+  daily_performance: DailyPerformanceParseResult;
 }
 
 export type KnownSheetParseResult = {
@@ -314,6 +324,21 @@ export async function parseSpreadsheetBufferPreview(buffer: Buffer): Promise<She
         case "host_okr":
           results.push({ sheetName, templateType, parsed: parseHostOkr(rows), error: null });
           break;
+        case "sales_line_items":
+          results.push({ sheetName, templateType, parsed: parseSalesLineItems(rows), error: null });
+          break;
+        case "marketing_costs":
+          results.push({ sheetName, templateType, parsed: parseMarketingCosts(rows), error: null });
+          break;
+        case "stock_snapshot":
+          results.push({ sheetName, templateType, parsed: parseStockSnapshot(rows), error: null });
+          break;
+        case "sales_targets":
+          results.push({ sheetName, templateType, parsed: parseSalesTargets(rows), error: null });
+          break;
+        case "daily_performance":
+          results.push({ sheetName, templateType, parsed: parseDailyPerformance(rows), error: null });
+          break;
       }
     } catch (err) {
       results.push({
@@ -329,6 +354,31 @@ export async function parseSpreadsheetBufferPreview(buffer: Buffer): Promise<She
 }
 
 export async function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "sales_line_items",
+): ParsedResultByTemplate["sales_line_items"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "marketing_costs",
+): ParsedResultByTemplate["marketing_costs"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "stock_snapshot",
+): ParsedResultByTemplate["stock_snapshot"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "sales_targets",
+): ParsedResultByTemplate["sales_targets"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "daily_performance",
+): ParsedResultByTemplate["daily_performance"];
+export function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
   templateType: ParsedTemplateType,
@@ -352,5 +402,15 @@ export async function parseSpreadsheetSheetFull(
       return parseMasterProduct(rows);
     case "host_okr":
       return parseHostOkr(rows);
+    case "sales_line_items":
+      return parseSalesLineItems(rows);
+    case "marketing_costs":
+      return parseMarketingCosts(rows);
+    case "stock_snapshot":
+      return parseStockSnapshot(rows);
+    case "sales_targets":
+      return parseSalesTargets(rows);
+    case "daily_performance":
+      return parseDailyPerformance(rows);
   }
 }

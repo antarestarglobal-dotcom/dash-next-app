@@ -6,6 +6,11 @@ export const TEMPLATE_TYPE_VALUES = [
   "order_detail",
   "master_product",
   "host_okr",
+  "sales_line_items",
+  "marketing_costs",
+  "stock_snapshot",
+  "sales_targets",
+  "daily_performance",
   "unknown",
 ] as const;
 

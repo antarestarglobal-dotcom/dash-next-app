@@ -180,6 +180,157 @@ export const hostOkr = pgTable(
   (t) => [unique().on(t.hostId, t.platformId, t.date, t.shift)],
 );
 
+export const stores = pgTable(
+  "stores",
+  {
+    id: serial("id").primaryKey(),
+    name: text("name").notNull(),
+    platform: text("platform").notNull(),
+    storeType: text("store_type").notNull(),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (t) => [unique().on(t.platform, t.storeType, t.name)],
+);
+
+export const salesLineItems = pgTable(
+  "sales_line_items",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    storeId: integer("store_id").references(() => stores.id),
+    brandId: integer("brand_id").references(() => brands.id),
+    productId: integer("product_id").references(() => products.id),
+    category: text("category"),
+    productName: text("product_name").notNull(),
+    sku: text("sku").notNull(),
+    qty: integer("qty").notNull(),
+    hargaJual: numeric("harga_jual", { precision: 18, scale: 2 }),
+    hpp: numeric("hpp", { precision: 18, scale: 2 }),
+    marginRp: numeric("margin_rp", { precision: 18, scale: 2 }),
+    marginPct: numeric("margin_pct", { precision: 8, scale: 4 }),
+    netSales: numeric("net_sales", { precision: 18, scale: 2 }),
+    netProfit: numeric("net_profit", { precision: 18, scale: 2 }),
+    klasifikasi: text("klasifikasi"),
+    sourceImportId: uuid("source_import_id").references(() => spreadsheetImports.id),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (t) => [unique().on(t.date, t.storeId, t.sku, t.productName)],
+);
+
+export const marketingCosts = pgTable(
+  "marketing_costs",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    variable: text("variable").notNull(),
+    platform: text("platform"),
+    storeId: integer("store_id").references(() => stores.id),
+    brandId: integer("brand_id").references(() => brands.id),
+    category: text("category"),
+    productName: text("product_name"),
+    sku: text("sku"),
+    qty: integer("qty"),
+    totalCost: numeric("total_cost", { precision: 18, scale: 2 }),
+    nilaiProduk: numeric("nilai_produk", { precision: 18, scale: 2 }),
+    ongkosKirim: numeric("ongkos_kirim", { precision: 18, scale: 2 }),
+    rateCard: numeric("rate_card", { precision: 18, scale: 2 }),
+    slot: text("slot"),
+    keterangan: text("keterangan"),
+    sourceImportId: uuid("source_import_id").references(() => spreadsheetImports.id),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (t) => [unique().on(t.date, t.variable, t.storeId, t.brandId, t.productName, t.sku)],
+);
+
+export const stockSnapshots = pgTable(
+  "stock_snapshots",
+  {
+    id: serial("id").primaryKey(),
+    snapshotDate: date("snapshot_date").notNull(),
+    productId: integer("product_id").references(() => products.id),
+    productName: text("product_name").notNull(),
+    sku: text("sku").notNull(),
+    category: text("category"),
+    hpp: numeric("hpp", { precision: 18, scale: 2 }),
+    totalQty: integer("total_qty").notNull(),
+    averageOut: numeric("average_out", { precision: 18, scale: 4 }),
+    averageRound: numeric("average_round", { precision: 18, scale: 4 }),
+    limit0Days: numeric("limit_0_days", { precision: 18, scale: 4 }),
+    dateLimit: date("date_limit"),
+    qtyOpenPo: integer("qty_open_po"),
+    sourceImportId: uuid("source_import_id").references(() => spreadsheetImports.id),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (t) => [unique().on(t.snapshotDate, t.sku)],
+);
+
+export const salesTargets = pgTable(
+  "sales_targets",
+  {
+    id: serial("id").primaryKey(),
+    period: text("period").notNull(),
+    brandId: integer("brand_id").references(() => brands.id),
+    productId: integer("product_id").references(() => products.id),
+    storeId: integer("store_id").references(() => stores.id),
+    platform: text("platform"),
+    type: text("type").notNull(),
+    nominal: numeric("nominal", { precision: 18, scale: 2 }).notNull(),
+    sourceImportId: uuid("source_import_id").references(() => spreadsheetImports.id),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (t) => [unique().on(t.period, t.brandId, t.productId, t.storeId, t.type)],
+);
+
+export const dailyStorePerformance = pgTable(
+  "daily_store_performance",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    storeId: integer("store_id").references(() => stores.id),
+    brandId: integer("brand_id").references(() => brands.id),
+    netSales: numeric("net_sales", { precision: 18, scale: 2 }),
+    margin: numeric("margin", { precision: 18, scale: 2 }),
+    gpm: numeric("gpm", { precision: 8, scale: 4 }),
+    marketingCost: numeric("marketing_cost", { precision: 18, scale: 2 }),
+    marketingRatio: numeric("marketing_ratio", { precision: 8, scale: 4 }),
+    netProfit: numeric("net_profit", { precision: 18, scale: 2 }),
+    npm: numeric("npm", { precision: 8, scale: 4 }),
+    totalIklan: numeric("total_iklan", { precision: 18, scale: 2 }),
+    iklan: numeric("iklan", { precision: 18, scale: 2 }),
+    gmv: numeric("gmv", { precision: 18, scale: 2 }),
+    liveGmv: numeric("live_gmv", { precision: 18, scale: 2 }),
+    contribution: numeric("contribution", { precision: 8, scale: 4 }),
+    hawa: numeric("hawa", { precision: 18, scale: 2 }),
+    sourceImportId: uuid("source_import_id").references(() => spreadsheetImports.id),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (t) => [unique().on(t.date, t.storeId, t.brandId)],
+);
+
+export const dailyMarketingBreakdown = pgTable(
+  "daily_marketing_breakdown",
+  {
+    id: serial("id").primaryKey(),
+    date: date("date").notNull(),
+    storeId: integer("store_id").references(() => stores.id),
+    brandId: integer("brand_id").references(() => brands.id),
+    variable: text("variable").notNull(),
+    contribution: numeric("contribution", { precision: 8, scale: 4 }),
+    hawa: numeric("hawa", { precision: 18, scale: 2 }),
+    totalCost: numeric("total_cost", { precision: 18, scale: 2 }),
+    sourceImportId: uuid("source_import_id").references(() => spreadsheetImports.id),
+    createdAt: timestamp("created_at").default(sql`now()`),
+    updatedAt: timestamp("updated_at").default(sql`now()`),
+  },
+  (t) => [unique().on(t.date, t.storeId, t.brandId, t.variable)],
+);
+
 export type Brand = typeof brands.$inferSelect;
 export type Platform = typeof platforms.$inferSelect;
 export type Channel = typeof channels.$inferSelect;
@@ -193,3 +344,10 @@ export type ProductBundle = typeof productBundles.$inferSelect;
 export type BundleItem = typeof bundleItems.$inferSelect;
 export type HostShiftGmv = typeof hostShiftGmv.$inferSelect;
 export type HostOkr = typeof hostOkr.$inferSelect;
+export type Store = typeof stores.$inferSelect;
+export type SalesLineItem = typeof salesLineItems.$inferSelect;
+export type MarketingCost = typeof marketingCosts.$inferSelect;
+export type StockSnapshot = typeof stockSnapshots.$inferSelect;
+export type SalesTarget = typeof salesTargets.$inferSelect;
+export type DailyStorePerformance = typeof dailyStorePerformance.$inferSelect;
+export type DailyMarketingBreakdown = typeof dailyMarketingBreakdown.$inferSelect;
