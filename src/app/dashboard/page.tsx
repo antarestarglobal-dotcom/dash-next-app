@@ -26,43 +26,54 @@ export default function DashboardPage() {
   const dashboard = data as DashboardData | undefined;
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex items-start justify-between flex-wrap gap-4">
+    <div className="flex flex-col gap-5">
+      {/* ── Page header ──────────────────────────────────────────────────── */}
+      <div className="flex items-end justify-between flex-wrap gap-4 pb-5 border-b-2 border-neutral-200">
         <div>
-          <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-0.5">
+          <p className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest mb-1">
             Overview
           </p>
-          <h1 className="text-2xl font-black text-neutral-950">Dashboard</h1>
+          <h1 className="text-2xl font-black text-neutral-950 leading-none">Dashboard</h1>
         </div>
         <DashboardFilters filters={filters} onChange={setFilters} />
       </div>
 
-      {isLoading && <p className="text-sm text-neutral-500">Memuat dashboard...</p>}
-      {isError && <BrutalAlert variant="error">{(error as Error).message}</BrutalAlert>}
+      {/* ── Loading / error states ────────────────────────────────────────── */}
+      {isLoading && (
+        <p className="text-sm text-neutral-400 font-medium">Memuat dashboard…</p>
+      )}
+      {isError && (
+        <BrutalAlert variant="error">{(error as Error).message}</BrutalAlert>
+      )}
 
+      {/* ── Content ──────────────────────────────────────────────────────── */}
       {!isLoading && !isError && dashboard && (
         <>
+          {/* Row 1 — hero metrics */}
           <MetricCards summary={dashboard.summary} bestHour={dashboard.bestHour} />
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <DailyTrendChart
-              data={dashboard.dailyMetrics as Parameters<typeof DailyTrendChart>[0]["data"]}
-            />
-            <HostLeaderboard
-              data={
-                dashboard.hostLeaderboard as Parameters<typeof HostLeaderboard>[0]["data"]
-              }
-            />
-          </div>
-
-          <HourlyHeatmap
-            data={dashboard.heatmap as Parameters<typeof HourlyHeatmap>[0]["data"]}
+          {/* Row 2 — trend chart (full width) */}
+          <DailyTrendChart
+            data={dashboard.dailyMetrics as Parameters<typeof DailyTrendChart>[0]["data"]}
           />
 
+          {/* Row 3 — heatmap + leaderboard side by side */}
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-5 items-start">
+            <div className="xl:col-span-2">
+              <HourlyHeatmap
+                data={dashboard.heatmap as Parameters<typeof HourlyHeatmap>[0]["data"]}
+              />
+            </div>
+            <div className="xl:col-span-1">
+              <HostLeaderboard
+                data={dashboard.hostLeaderboard as Parameters<typeof HostLeaderboard>[0]["data"]}
+              />
+            </div>
+          </div>
+
+          {/* Row 4 — detail table (recedes visually, no shadow) */}
           <DailyMetricsTable
-            data={
-              dashboard.dailyMetrics as Parameters<typeof DailyMetricsTable>[0]["data"]
-            }
+            data={dashboard.dailyMetrics as Parameters<typeof DailyMetricsTable>[0]["data"]}
           />
         </>
       )}

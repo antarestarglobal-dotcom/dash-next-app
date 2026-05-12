@@ -42,7 +42,7 @@ export function HostLeaderboard({ data }: HostLeaderboardProps) {
   );
 
   return (
-    <BrutalCard title="Host Leaderboard">
+    <BrutalCard title="Host Leaderboard" className="h-full">
       <BrutalDataTable data={rankedData} columns={columns} pageSize={10} />
     </BrutalCard>
   );

@@ -42,7 +42,7 @@ interface DailyMetricsTableProps {
 
 export function DailyMetricsTable({ data }: DailyMetricsTableProps) {
   return (
-    <BrutalCard title="Daily Metrics">
+    <BrutalCard title="Daily Metrics" variant="flat">
       <BrutalDataTable data={data} columns={columns} pageSize={20} globalFilter />
     </BrutalCard>
   );
