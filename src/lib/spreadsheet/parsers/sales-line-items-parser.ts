@@ -32,20 +32,20 @@ export type SalesLineItemRow = z.infer<typeof SalesLineItemRowSchema>;
 export type SalesLineItemsParseResult = z.infer<typeof SalesLineItemsParseResultSchema>;
 
 const toRawSalesRow = (row: readonly unknown[], columns: ReadonlyMap<string, number>) => ({
-  date: parseAnyDate(getCell(row, columns, ["tanggal", "date"])),
-  platform: textCell(getCell(row, columns, ["platform"])),
-  store: textCell(getCell(row, columns, ["store"])),
-  brand: textCell(getCell(row, columns, ["brand"])),
-  kategori: textCell(getCell(row, columns, ["kategori", "category"])) || null,
-  produk: textCell(getCell(row, columns, ["produk", "product"])),
-  sku: textCell(getCell(row, columns, ["sku"])),
-  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty", "quantity"])) ?? 0),
-  hargaJual: parseIndonesianNumber(getCell(row, columns, ["harga jual", "price"])) ?? 0,
-  hpp: parseIndonesianNumber(getCell(row, columns, ["hpp", "cogs", "cost of goods"])) ?? 0,
-  marginRp: parseIndonesianNumber(getCell(row, columns, ["margin rp", "profit", "gross profit"])) ?? 0,
-  marginPct: parseIndonesianPercent(getCell(row, columns, ["margin %", "margin"])) ?? 0,
-  netSales: parseIndonesianNumber(getCell(row, columns, ["net sales", "revenue"])) ?? 0,
-  netProfit: parseIndonesianNumber(getCell(row, columns, ["net profit"])) ?? 0,
+  date: parseAnyDate(getCell(row, columns, ["tanggal", "date", "tgl"])),
+  platform: textCell(getCell(row, columns, ["platform", "marketplace"])),
+  store: textCell(getCell(row, columns, ["store", "toko", "nama toko", "store name"])),
+  brand: textCell(getCell(row, columns, ["brand", "merek"])),
+  kategori: textCell(getCell(row, columns, ["kategori", "category", "cat"])) || null,
+  produk: textCell(getCell(row, columns, ["produk", "product", "product name", "nama produk", "item"])),
+  sku: textCell(getCell(row, columns, ["sku", "sku id", "kode sku", "kode produk"])),
+  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty", "quantity", "jumlah"])) ?? 0),
+  hargaJual: parseIndonesianNumber(getCell(row, columns, ["harga jual", "price", "selling price", "harga"])) ?? 0,
+  hpp: parseIndonesianNumber(getCell(row, columns, ["hpp", "cogs", "cost of goods", "cost", "modal"])) ?? 0,
+  marginRp: parseIndonesianNumber(getCell(row, columns, ["margin rp", "margin", "profit", "gross profit", "laba kotor"])) ?? 0,
+  marginPct: parseIndonesianPercent(getCell(row, columns, ["margin %", "margin pct", "gpm", "margin persen"])) ?? 0,
+  netSales: parseIndonesianNumber(getCell(row, columns, ["net sales", "revenue", "penjualan bersih", "penjualan"])) ?? 0,
+  netProfit: parseIndonesianNumber(getCell(row, columns, ["net profit", "laba bersih", "profit bersih", "nett profit"])) ?? 0,
 });
 
 export const parseSalesLineItems = (rows: readonly unknown[][]): SalesLineItemsParseResult => {

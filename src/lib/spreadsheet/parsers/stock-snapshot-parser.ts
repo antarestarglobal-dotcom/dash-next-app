@@ -28,16 +28,16 @@ export type StockSnapshotRow = z.infer<typeof StockSnapshotRowSchema>;
 export type StockSnapshotParseResult = z.infer<typeof StockSnapshotParseResultSchema>;
 
 const toRawStockRow = (row: readonly unknown[], columns: ReadonlyMap<string, number>) => ({
-  productName: textCell(getCell(row, columns, ["name", "produk"])),
-  sku: textCell(getCell(row, columns, ["sku"])),
-  category: textCell(getCell(row, columns, ["category", "kategori"])) || null,
-  hpp: parseIndonesianNumber(getCell(row, columns, ["hpp"])),
-  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty", "total qty"])) ?? 0),
-  averageOut: parseIndonesianNumber(getCell(row, columns, ["average out"])),
-  averageRound: parseIndonesianNumber(getCell(row, columns, ["average round"])),
-  limit0Days: parseIndonesianNumber(getCell(row, columns, ["limit 0 days", "limit 0"])),
-  dateLimit: parseAnyDate(getCell(row, columns, ["date limit"])),
-  qtyOpenPo: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty open po"])) ?? 0) || null,
+  productName: textCell(getCell(row, columns, ["name", "product name", "nama produk", "produk", "item name", "item"])),
+  sku: textCell(getCell(row, columns, ["sku", "sku id", "kode sku", "kode produk", "item sku"])),
+  category: textCell(getCell(row, columns, ["category", "kategori", "cat"])) || null,
+  hpp: parseIndonesianNumber(getCell(row, columns, ["hpp", "cogs", "cost"])),
+  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty", "total qty", "stock qty", "stok", "total stok", "quantity"])) ?? 0),
+  averageOut: parseIndonesianNumber(getCell(row, columns, ["average out", "avg out", "rata rata keluar"])),
+  averageRound: parseIndonesianNumber(getCell(row, columns, ["average round", "avg round"])),
+  limit0Days: parseIndonesianNumber(getCell(row, columns, ["limit 0 days", "limit 0", "limit days", "limit hari"])),
+  dateLimit: parseAnyDate(getCell(row, columns, ["date limit", "tanggal limit", "batas tanggal"])),
+  qtyOpenPo: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty open po", "open po", "po qty"])) ?? 0) || null,
 });
 
 export const parseStockSnapshot = (rows: readonly unknown[][]): StockSnapshotParseResult => {

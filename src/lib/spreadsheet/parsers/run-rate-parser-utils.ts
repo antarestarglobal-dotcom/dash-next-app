@@ -17,10 +17,19 @@ export const buildColumnMap = (row: readonly unknown[]): ReadonlyMap<string, num
   new Map(row.map((cell, index) => [normalizeHeader(cell), index]));
 
 export const getColumn = (columns: ReadonlyMap<string, number>, aliases: readonly string[]): number | null => {
-  const entry = aliases
-    .map((alias) => columns.get(normalizeHeader(alias)))
-    .find((index) => index !== undefined);
-  return entry ?? null;
+  // Exact match first
+  for (const alias of aliases) {
+    const index = columns.get(normalizeHeader(alias));
+    if (index !== undefined) return index;
+  }
+  // Substring fallback — handles headers like "Total Cost (IDR)" or "HPP/COGS"
+  for (const alias of aliases) {
+    const normalized = normalizeHeader(alias);
+    for (const [key, index] of columns) {
+      if (key.includes(normalized) || normalized.includes(key)) return index;
+    }
+  }
+  return null;
 };
 
 export const getCell = (
