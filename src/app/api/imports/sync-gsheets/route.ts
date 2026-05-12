@@ -29,13 +29,27 @@ export async function POST(req: NextRequest) {
     const exportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=xlsx`;
     logInfo("POST /api/imports/sync-gsheets", `Fetching sheet ${sheetId}`);
 
+    const BROWSER_HEADERS = {
+      "User-Agent":
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+      Accept:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/octet-stream,*/*",
+    };
+
     let gResponse: Response;
     try {
-      gResponse = await fetch(exportUrl);
+      gResponse = await fetch(exportUrl, { headers: BROWSER_HEADERS, redirect: "follow" });
     } catch {
       throw new DomainError(
         "FETCH_ERROR",
-        "Gagal mengunduh Google Sheets. Pastikan spreadsheet bisa diakses publik.",
+        "Gagal mengunduh Google Sheets. Periksa koneksi server dan pastikan spreadsheet bisa diakses publik.",
+      );
+    }
+
+    if (gResponse.status === 401 || gResponse.status === 403) {
+      throw new DomainError(
+        "FETCH_ERROR",
+        `Google Sheets mengembalikan HTTP ${gResponse.status}. Buka spreadsheet → Share → General access → pilih "Anyone with the link" = Viewer.`,
       );
     }
 
@@ -43,6 +57,14 @@ export async function POST(req: NextRequest) {
       throw new DomainError(
         "FETCH_ERROR",
         `Google Sheets mengembalikan HTTP ${gResponse.status}. Pastikan spreadsheet diset "Anyone with the link = Viewer".`,
+      );
+    }
+
+    const contentType = gResponse.headers.get("content-type") ?? "";
+    if (contentType.includes("text/html")) {
+      throw new DomainError(
+        "FETCH_ERROR",
+        'Google mengalihkan ke halaman login. Buka spreadsheet → Share → General access → pilih "Anyone with the link" = Viewer, lalu coba lagi.',
       );
     }
 
