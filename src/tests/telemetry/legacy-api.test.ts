@@ -3,18 +3,13 @@ import { ApiError } from "@/lib/api-client";
 import { reportLegacyApiError } from "@/lib/telemetry/legacy-api";
 
 describe("reportLegacyApiError", () => {
-  const originalNodeEnv = process.env.NODE_ENV;
-
-  beforeEach(() => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
     vi.restoreAllMocks();
   });
 
-  afterEach(() => {
-    process.env.NODE_ENV = originalNodeEnv;
-  });
-
   it("does not log in production", () => {
-    process.env.NODE_ENV = "production";
+    vi.stubEnv("NODE_ENV", "production");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     reportLegacyApiError("runrate", new ApiError("LEGACY_API_ERROR", "HTTP 403", 403));
@@ -23,7 +18,7 @@ describe("reportLegacyApiError", () => {
   });
 
   it("logs normalized ApiError metadata in non-production", () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     reportLegacyApiError("funnel", new ApiError("INVALID_RESPONSE", "bad payload", 200), {
@@ -45,7 +40,7 @@ describe("reportLegacyApiError", () => {
   });
 
   it("logs fallback metadata for non-Error values", () => {
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NODE_ENV", "development");
     const warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
 
     reportLegacyApiError("runrate", "timeout");

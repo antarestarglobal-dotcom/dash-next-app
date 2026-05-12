@@ -9,7 +9,7 @@ function mapLegacyClass(cls: string): ProductMetric["klasifikasi"] {
 }
 
 export function mapLegacyProductsToRunRateMetrics(
-  response: LegacyRunrateResponse,
+  response: Omit<LegacyRunrateResponse, "products"> & { products: readonly LegacyRunrateResponse["products"][number][] },
 ): ProductMetric[] {
   const seen = new Set<string>();
 
