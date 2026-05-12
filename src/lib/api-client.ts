@@ -64,7 +64,7 @@ export async function apiFetch<TSchema extends z.ZodTypeAny>(
     throw new ApiError("INVALID_RESPONSE", "Format respons server tidak dikenali", res.status);
   }
 
-  const dataParsed = dataSchema.safeParse(envelope.data.data);
+  const dataParsed = dataSchema.safeParse(envelope.data);
   if (!dataParsed.success) {
     throw new ApiError("INVALID_RESPONSE", "Format respons server tidak dikenali", res.status);
   }

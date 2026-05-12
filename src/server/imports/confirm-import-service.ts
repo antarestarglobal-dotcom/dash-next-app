@@ -12,6 +12,13 @@ import {
   bundleItems,
   hostShiftGmv,
   hostOkr,
+  stores,
+  salesLineItems,
+  marketingCosts,
+  stockSnapshots,
+  salesTargets,
+  dailyStorePerformance,
+  dailyMarketingBreakdown,
 } from "@/db/schema";
 import { eq, inArray, sql } from "drizzle-orm";
 import { getImportById, updateImportStatus } from "./import-repository";
@@ -26,6 +33,11 @@ import type { HostGmvParseResult } from "@/lib/spreadsheet/parsers/host-gmv-pars
 import type { OrderDetailParseResult } from "@/lib/spreadsheet/parsers/order-detail-parser";
 import type { MasterProductParseResult } from "@/lib/spreadsheet/parsers/master-product-parser";
 import type { HostOkrParseResult } from "@/lib/spreadsheet/parsers/host-okr-parser";
+import type { SalesLineItemsParseResult } from "@/lib/spreadsheet/parsers/sales-line-items-parser";
+import type { MarketingCostsParseResult } from "@/lib/spreadsheet/parsers/marketing-costs-parser";
+import type { StockSnapshotParseResult } from "@/lib/spreadsheet/parsers/stock-snapshot-parser";
+import type { SalesTargetsParseResult } from "@/lib/spreadsheet/parsers/sales-targets-parser";
+import type { DailyPerformanceParseResult } from "@/lib/spreadsheet/parsers/daily-performance-parser";
 import type { ParsedTemplateType } from "@/lib/domain/import-domain";
 
 const CHUNK_SIZE = 2000;
@@ -93,6 +105,46 @@ async function batchUpsertHosts(names: string[]): Promise<Map<string, number>> {
     .from(hosts)
     .where(inArray(hosts.name, unique));
   return new Map(rows.map((r) => [r.name, r.id]));
+}
+
+async function batchUpsertStores(rows: Array<{ platform: string; store: string }>): Promise<Map<string, number>> {
+  const unique = deduplicateBy(
+    rows.filter((row) => row.platform && row.store),
+    (row) => `${row.platform.toLowerCase()}|${row.store.toLowerCase()}`,
+  );
+  if (unique.length === 0) return new Map();
+  await db
+    .insert(stores)
+    .values(
+      unique.map((row) => ({
+        name: row.store,
+        platform: row.platform.toLowerCase(),
+        storeType: row.store.toLowerCase().includes(" mp") ? "mp" : row.store.toLowerCase().includes("sport") ? "sport" : "official",
+      })),
+    )
+    .onConflictDoNothing();
+  const dbRows = await db.select({ id: stores.id, name: stores.name, platform: stores.platform }).from(stores);
+  return new Map(dbRows.map((row) => [`${row.platform.toLowerCase()}|${row.name.toLowerCase()}`, row.id]));
+}
+
+async function getProductIdBySkuMap(skus: string[]): Promise<Map<string, number>> {
+  const unique = [...new Set(skus.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ id: products.id, variantSku: products.variantSku, productName: products.productName })
+    .from(products)
+    .where(inArray(products.variantSku, unique));
+  return new Map(rows.map((row) => [row.variantSku, row.id]));
+}
+
+async function getProductIdByNameMap(names: string[]): Promise<Map<string, number>> {
+  const unique = [...new Set(names.filter(Boolean))];
+  if (unique.length === 0) return new Map();
+  const rows = await db
+    .select({ id: products.id, productName: products.productName })
+    .from(products)
+    .where(inArray(products.productName, unique));
+  return new Map(rows.map((row) => [row.productName, row.id]));
 }
 
 // Deduplicate rows by a composite key — PostgreSQL rejects ON CONFLICT DO UPDATE
@@ -385,6 +437,159 @@ async function confirmHostOkr(
   }
 }
 
+async function confirmSalesLineItems(parsed: SalesLineItemsParseResult, importId: string): Promise<void> {
+  const rows = deduplicateBy(parsed.rows, (row) => `${row.date}|${row.platform}|${row.store}|${row.sku}|${row.produk}`);
+  const brandMap = await batchUpsertBrands(rows.map((row) => row.brand));
+  const storeMap = await batchUpsertStores(rows.map((row) => ({ platform: row.platform, store: row.store })));
+  const productMap = await getProductIdBySkuMap(rows.map((row) => row.sku));
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    await db.insert(salesLineItems).values(chunk.map((row) => ({
+      date: row.date,
+      storeId: storeMap.get(`${row.platform.toLowerCase()}|${row.store.toLowerCase()}`) ?? null,
+      brandId: brandMap.get(row.brand) ?? null,
+      productId: productMap.get(row.sku) ?? null,
+      category: row.kategori,
+      productName: row.produk,
+      sku: row.sku,
+      qty: row.qty,
+      hargaJual: row.hargaJual.toString(),
+      hpp: row.hpp.toString(),
+      marginRp: row.marginRp.toString(),
+      marginPct: row.marginPct.toString(),
+      netSales: row.netSales.toString(),
+      netProfit: row.netProfit.toString(),
+      sourceImportId: importId,
+    }))).onConflictDoUpdate({
+      target: [salesLineItems.date, salesLineItems.storeId, salesLineItems.sku, salesLineItems.productName],
+      set: { qty: sql`excluded.qty`, hargaJual: sql`excluded.harga_jual`, hpp: sql`excluded.hpp`, marginRp: sql`excluded.margin_rp`, marginPct: sql`excluded.margin_pct`, netSales: sql`excluded.net_sales`, netProfit: sql`excluded.net_profit`, sourceImportId: sql`excluded.source_import_id`, updatedAt: sql`now()` },
+    });
+  }
+}
+
+async function confirmMarketingCosts(parsed: MarketingCostsParseResult, importId: string): Promise<void> {
+  const rows = deduplicateBy(parsed.rows, (row) => `${row.date}|${row.variable}|${row.platform}|${row.storeOrBrand}|${row.produk}|${row.sku}`);
+  const brandMap = await batchUpsertBrands(rows.map((row) => row.storeOrBrand).filter((name): name is string => Boolean(name)));
+  const storeMap = await batchUpsertStores(rows.map((row) => ({ platform: row.platform ?? "unknown", store: row.storeOrBrand ?? "Unknown" })));
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    await db.insert(marketingCosts).values(chunk.map((row) => ({
+      date: row.date,
+      variable: row.variable,
+      platform: row.platform,
+      storeId: row.platform && row.storeOrBrand ? storeMap.get(`${row.platform.toLowerCase()}|${row.storeOrBrand.toLowerCase()}`) ?? null : null,
+      brandId: row.storeOrBrand ? brandMap.get(row.storeOrBrand) ?? null : null,
+      category: row.kategori,
+      productName: row.produk,
+      sku: row.sku,
+      qty: row.qty,
+      totalCost: row.totalBiaya.toString(),
+      nilaiProduk: row.nilaiProduk?.toString() ?? null,
+      ongkosKirim: row.ongkosKirim?.toString() ?? null,
+      rateCard: row.rateCard?.toString() ?? null,
+      slot: row.slot,
+      keterangan: row.keterangan,
+      sourceImportId: importId,
+    }))).onConflictDoUpdate({
+      target: [marketingCosts.date, marketingCosts.variable, marketingCosts.storeId, marketingCosts.brandId, marketingCosts.productName, marketingCosts.sku],
+      set: { totalCost: sql`excluded.total_cost`, nilaiProduk: sql`excluded.nilai_produk`, ongkosKirim: sql`excluded.ongkos_kirim`, rateCard: sql`excluded.rate_card`, slot: sql`excluded.slot`, keterangan: sql`excluded.keterangan`, sourceImportId: sql`excluded.source_import_id`, updatedAt: sql`now()` },
+    });
+  }
+}
+
+async function confirmStockSnapshot(parsed: StockSnapshotParseResult, importId: string): Promise<void> {
+  const snapshotDate = new Date().toISOString().slice(0, 10);
+  const rows = deduplicateBy(parsed.rows, (row) => `${snapshotDate}|${row.sku}`);
+  const productMap = await getProductIdBySkuMap(rows.map((row) => row.sku));
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    await db.insert(stockSnapshots).values(chunk.map((row) => ({
+      snapshotDate,
+      productId: productMap.get(row.sku) ?? null,
+      productName: row.productName,
+      sku: row.sku,
+      category: row.category,
+      hpp: row.hpp?.toString() ?? null,
+      totalQty: row.qty,
+      averageOut: row.averageOut?.toString() ?? null,
+      averageRound: row.averageRound?.toString() ?? null,
+      limit0Days: row.limit0Days?.toString() ?? null,
+      dateLimit: row.dateLimit,
+      qtyOpenPo: row.qtyOpenPo,
+      sourceImportId: importId,
+    }))).onConflictDoUpdate({
+      target: [stockSnapshots.snapshotDate, stockSnapshots.sku],
+      set: { totalQty: sql`excluded.total_qty`, averageOut: sql`excluded.average_out`, averageRound: sql`excluded.average_round`, limit0Days: sql`excluded.limit_0_days`, dateLimit: sql`excluded.date_limit`, qtyOpenPo: sql`excluded.qty_open_po`, sourceImportId: sql`excluded.source_import_id`, updatedAt: sql`now()` },
+    });
+  }
+}
+
+async function confirmSalesTargets(parsed: SalesTargetsParseResult, importId: string): Promise<void> {
+  const rows = deduplicateBy(parsed.rows, (row) => `${row.period}|${row.brand}|${row.produk}|${row.platform}|${row.type}`);
+  const brandMap = await batchUpsertBrands(rows.map((row) => row.brand));
+  const productMap = await getProductIdByNameMap(rows.map((row) => row.produk).filter((name): name is string => Boolean(name)));
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    await db.insert(salesTargets).values(chunk.map((row) => ({
+      period: row.period,
+      brandId: brandMap.get(row.brand) ?? null,
+      productId: row.produk ? productMap.get(row.produk) ?? null : null,
+      storeId: null,
+      platform: row.platform,
+      type: row.type,
+      nominal: row.nominal.toString(),
+      sourceImportId: importId,
+    }))).onConflictDoUpdate({
+      target: [salesTargets.period, salesTargets.brandId, salesTargets.productId, salesTargets.storeId, salesTargets.type],
+      set: { nominal: sql`excluded.nominal`, platform: sql`excluded.platform`, sourceImportId: sql`excluded.source_import_id`, updatedAt: sql`now()` },
+    });
+  }
+}
+
+async function confirmDailyPerformance(parsed: DailyPerformanceParseResult, importId: string): Promise<void> {
+  const rows = deduplicateBy(parsed.rows, (row) => row.date);
+  for (let i = 0; i < rows.length; i += CHUNK_SIZE) {
+    const chunk = rows.slice(i, i + CHUNK_SIZE);
+    await db.insert(dailyStorePerformance).values(chunk.map((row) => ({
+      date: row.date,
+      storeId: null,
+      brandId: null,
+      netSales: row.netSales.toString(),
+      margin: row.margin.toString(),
+      gpm: row.gpm.toString(),
+      marketingCost: row.marketingCost.toString(),
+      marketingRatio: row.marketingRatio.toString(),
+      netProfit: row.netProfit.toString(),
+      npm: row.npm.toString(),
+      totalIklan: row.totalIklan.toString(),
+      iklan: row.iklan.toString(),
+      gmv: row.gmv.toString(),
+      liveGmv: row.liveGmv.toString(),
+      contribution: row.contribution.toString(),
+      hawa: row.hawa.toString(),
+      sourceImportId: importId,
+    }))).onConflictDoUpdate({
+      target: [dailyStorePerformance.date, dailyStorePerformance.storeId, dailyStorePerformance.brandId],
+      set: { netSales: sql`excluded.net_sales`, margin: sql`excluded.margin`, gpm: sql`excluded.gpm`, marketingCost: sql`excluded.marketing_cost`, marketingRatio: sql`excluded.marketing_ratio`, netProfit: sql`excluded.net_profit`, npm: sql`excluded.npm`, totalIklan: sql`excluded.total_iklan`, iklan: sql`excluded.iklan`, gmv: sql`excluded.gmv`, liveGmv: sql`excluded.live_gmv`, contribution: sql`excluded.contribution`, hawa: sql`excluded.hawa`, sourceImportId: sql`excluded.source_import_id`, updatedAt: sql`now()` },
+    });
+  }
+  if (parsed.breakdownRows.length > 0) {
+    await db.insert(dailyMarketingBreakdown).values(parsed.breakdownRows.map((row) => ({
+      date: row.date,
+      storeId: null,
+      brandId: null,
+      variable: row.variable,
+      contribution: row.contribution.toString(),
+      hawa: row.hawa.toString(),
+      totalCost: row.hawa.toString(),
+      sourceImportId: importId,
+    }))).onConflictDoUpdate({
+      target: [dailyMarketingBreakdown.date, dailyMarketingBreakdown.storeId, dailyMarketingBreakdown.brandId, dailyMarketingBreakdown.variable],
+      set: { contribution: sql`excluded.contribution`, hawa: sql`excluded.hawa`, totalCost: sql`excluded.total_cost`, sourceImportId: sql`excluded.source_import_id`, updatedAt: sql`now()` },
+    });
+  }
+}
+
 export async function confirmImport(importId: string): Promise<void> {
   const t0 = Date.now();
   const importRecord = await getImportById(importId);
@@ -448,6 +653,21 @@ export async function confirmImport(importId: string): Promise<void> {
         break;
       case "host_okr":
         await confirmHostOkr(parseSpreadsheetSheetFull(fileBuffer, sheetName, "host_okr"), importId);
+        break;
+      case "sales_line_items":
+        await confirmSalesLineItems(parseSpreadsheetSheetFull(fileBuffer, sheetName, "sales_line_items"), importId);
+        break;
+      case "marketing_costs":
+        await confirmMarketingCosts(parseSpreadsheetSheetFull(fileBuffer, sheetName, "marketing_costs"), importId);
+        break;
+      case "stock_snapshot":
+        await confirmStockSnapshot(parseSpreadsheetSheetFull(fileBuffer, sheetName, "stock_snapshot"), importId);
+        break;
+      case "sales_targets":
+        await confirmSalesTargets(parseSpreadsheetSheetFull(fileBuffer, sheetName, "sales_targets"), importId);
+        break;
+      case "daily_performance":
+        await confirmDailyPerformance(parseSpreadsheetSheetFull(fileBuffer, sheetName, "daily_performance"), importId);
         break;
     }
 
