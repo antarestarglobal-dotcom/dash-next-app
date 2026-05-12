@@ -32,7 +32,7 @@ const toRawStockRow = (row: readonly unknown[], columns: ReadonlyMap<string, num
   sku: textCell(getCell(row, columns, ["sku"])),
   category: textCell(getCell(row, columns, ["category", "kategori"])) || null,
   hpp: parseIndonesianNumber(getCell(row, columns, ["hpp"])),
-  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty"])) ?? 0),
+  qty: Math.round(parseIndonesianNumber(getCell(row, columns, ["qty", "total qty"])) ?? 0),
   averageOut: parseIndonesianNumber(getCell(row, columns, ["average out"])),
   averageRound: parseIndonesianNumber(getCell(row, columns, ["average round"])),
   limit0Days: parseIndonesianNumber(getCell(row, columns, ["limit 0 days", "limit 0"])),
@@ -41,7 +41,7 @@ const toRawStockRow = (row: readonly unknown[], columns: ReadonlyMap<string, num
 });
 
 export const parseStockSnapshot = (rows: readonly unknown[][]): StockSnapshotParseResult => {
-  const headerIndex = findHeaderRow(rows, ["sku", "hpp", "qty", "average out"]);
+  const headerIndex = findHeaderRow(rows, ["sku", "average out"]);
   if (headerIndex < 0) return { templateType: "stock_snapshot", summary: { totalRows: 0, validRows: 0, rejectedRowsCount: 0 }, rows: [], warnings: ["Header stok tidak ditemukan"], rejectedRows: [] };
   const columns = buildColumnMap(rows[headerIndex] ?? []);
   const parsed = nonEmptyDataRows(rows, headerIndex).map((row, index) => ({ row, index, parsed: StockSnapshotRowSchema.safeParse(toRawStockRow(row, columns)) }));

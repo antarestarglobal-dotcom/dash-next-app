@@ -16,8 +16,8 @@ const SHEET_NAME_MAP: Record<string, TemplateType> = {
   stok: "stock_snapshot",
   stock: "stock_snapshot",
   target: "sales_targets",
-  "data-accel": "daily_performance",
-  "data accel": "daily_performance",
+  "data-accel": "stock_snapshot",
+  "data accel": "stock_snapshot",
 };
 
 const GMV_HOST_PATTERN = /^gmv host/i;
@@ -40,7 +40,7 @@ export function detectTemplateBySheetName(sheetName: string): TemplateType {
   if (["marketing", "voucher", "iklan", "affiliate", "sample", "endorse", "other cost"].some((name) => lower.includes(name))) return "marketing_costs";
   if (lower.includes("stok") || lower.includes("stock")) return "stock_snapshot";
   if (lower.includes("target")) return "sales_targets";
-  if (lower.includes("data-accel") || lower.includes("data accel")) return "daily_performance";
+  if (lower.includes("data-accel") || lower.includes("data accel")) return "stock_snapshot";
   if (lower.includes("gmv")) return "host_gmv";
   if (lower.includes("okr")) return "host_okr";
 
@@ -64,11 +64,19 @@ export function detectTemplateByHeaderScan(rows: unknown[][]): TemplateType {
       return "order_detail";
     if (joined.includes("sku induk") || joined.includes("sku varian"))
       return "master_product";
-    if (joined.includes("tanggal") && joined.includes("platform") && joined.includes("sku") && joined.includes("harga jual"))
+    if (
+      (joined.includes("tanggal") || joined.includes("date")) &&
+      joined.includes("platform") && joined.includes("sku") &&
+      (joined.includes("harga jual") || joined.includes("price"))
+    )
       return "sales_line_items";
-    if (joined.includes("tanggal") && joined.includes("variable") && joined.includes("total biaya"))
+    if (
+      (joined.includes("tanggal") || joined.includes("date")) &&
+      (joined.includes("variable") || joined.includes("voucher type") || joined.includes("affiliate type") || joined.includes("metric type")) &&
+      (joined.includes("total biaya") || joined.includes("total cost") || joined.includes("value") || joined.includes("sales value") || joined.includes("gmv value"))
+    )
       return "marketing_costs";
-    if (joined.includes("sku") && joined.includes("hpp") && joined.includes("average out") && joined.includes("limit 0"))
+    if (joined.includes("sku") && joined.includes("average out"))
       return "stock_snapshot";
     if (joined.includes("periode") && joined.includes("brand") && joined.includes("nominal"))
       return "sales_targets";
