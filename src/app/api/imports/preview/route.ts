@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createImportPreview } from "@/server/imports/import-service";
 import { validateFileBuffer } from "@/lib/spreadsheet/parse-spreadsheet";
+import { ImportPreviewResponseSchema } from "@/lib/validators/import";
 import { apiSuccess, apiError } from "@/lib/validators/api";
+import { DomainError, getDomainErrorStatus, isDomainError } from "@/lib/errors/domain-error";
 import { logError, logInfo, devDetails } from "@/lib/logger";
 
 // maxDuration is only honoured on Vercel — harmless in local dev
@@ -13,7 +15,7 @@ export async function POST(req: NextRequest) {
     const file = formData.get("file");
 
     if (!file || typeof file === "string") {
-      return NextResponse.json(apiError("MISSING_FILE", "File tidak ditemukan"), { status: 400 });
+      throw new DomainError("MISSING_FILE", "File tidak ditemukan");
     }
 
     const allowedTypes = [
@@ -23,9 +25,9 @@ export async function POST(req: NextRequest) {
     ];
 
     if (!allowedTypes.includes(file.type) && !file.name.match(/\.(xlsx|xls|csv)$/i)) {
-      return NextResponse.json(
-        apiError("UNSUPPORTED_FILE_TYPE", "Hanya file XLSX, XLS, atau CSV yang didukung"),
-        { status: 400 },
+      throw new DomainError(
+        "UNSUPPORTED_FILE_TYPE",
+        "Hanya file XLSX, XLS, atau CSV yang didukung",
       );
     }
 
@@ -34,10 +36,7 @@ export async function POST(req: NextRequest) {
     // Validate file content before handing to xlsx library
     const validation = validateFileBuffer(buffer, file.name);
     if (!validation.ok) {
-      return NextResponse.json(
-        apiError("INVALID_FILE", validation.error),
-        { status: 400 },
-      );
+      throw new DomainError("INVALID_FILE", validation.error);
     }
 
     logInfo("POST /api/imports/preview", `Processing file`, {
@@ -49,16 +48,25 @@ export async function POST(req: NextRequest) {
     const results = await createImportPreview(buffer, file.name);
 
     if (results.length === 0) {
+      throw new DomainError("NO_SHEET_RECOGNIZED", "Tidak ada sheet yang dikenali dari file ini");
+    }
+
+    const response = ImportPreviewResponseSchema.parse(results);
+    logInfo("POST /api/imports/preview", `Done — ${response.length} sheet(s) processed`);
+    return NextResponse.json(apiSuccess(response));
+  } catch (err) {
+    logError("POST /api/imports/preview", err);
+
+    if (isDomainError(err)) {
       return NextResponse.json(
-        apiError("NO_SHEET_RECOGNIZED", "Tidak ada sheet yang dikenali dari file ini"),
-        { status: 422 },
+        {
+          ...apiError(err.code, err.message, err.details),
+          ...(devDetails(err) && { debug: devDetails(err) }),
+        },
+        { status: getDomainErrorStatus(err.code) },
       );
     }
 
-    logInfo("POST /api/imports/preview", `Done — ${results.length} sheet(s) processed`);
-    return NextResponse.json(apiSuccess(results));
-  } catch (err) {
-    logError("POST /api/imports/preview", err);
     return NextResponse.json(
       {
         ...apiError("INTERNAL_ERROR", err instanceof Error ? err.message : "Internal server error"),

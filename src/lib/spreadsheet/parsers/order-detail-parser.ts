@@ -5,7 +5,7 @@ import { isEmptyRow } from "../helpers/normalize";
 import { findHeaderRow } from "../helpers/detect-header";
 import type { OrderDetailRow } from "../../validators/import";
 
-interface OrderDetailParseResult {
+export interface OrderDetailParseResult {
   templateType: "order_detail";
   summary: {
     totalRows: number;
@@ -57,12 +57,9 @@ export function parseOrderDetail(
     ? Math.min(headerIdx + 1 + previewLimit, rows.length)
     : rows.length;
 
-  let totalScanned = 0;
-
   for (let i = headerIdx + 1; i < limit; i++) {
     const row = rows[i];
     if (!row || isEmptyRow(row)) continue;
-    totalScanned++;
 
     const rawDate = colMap.date !== undefined ? row[colMap.date] : null;
     const dateStr = parseAnyDate(rawDate);

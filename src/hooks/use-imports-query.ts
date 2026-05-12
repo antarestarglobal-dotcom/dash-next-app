@@ -1,9 +1,13 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { z } from "zod";
 import { apiFetch } from "@/lib/api-client";
-import type { ImportStatus, TemplateType } from "@/lib/validators/import";
+import {
+  ImportListResponseSchema,
+  ImportDetailResponseSchema,
+  type ImportStatus,
+  type TemplateType,
+} from "@/lib/validators/import";
 
 interface UseImportsQueryOptions {
   page?: number;
@@ -21,7 +25,7 @@ export function useImportsQuery(options: UseImportsQueryOptions = {}) {
       const params = new URLSearchParams({ page: String(page), limit: String(limit) });
       if (status) params.set("status", status);
       if (templateType) params.set("templateType", templateType);
-      return apiFetch(`/api/imports?${params}`, z.array(z.unknown()));
+      return apiFetch(`/api/imports?${params}`, ImportListResponseSchema);
     },
   });
 }
@@ -29,7 +33,13 @@ export function useImportsQuery(options: UseImportsQueryOptions = {}) {
 export function useImportDetailQuery(importId: string | null) {
   return useQuery({
     queryKey: ["import", importId],
-    queryFn: () => apiFetch(`/api/imports/${importId}`, z.unknown()),
+    queryFn: () => {
+      if (!importId) {
+        throw new Error("Import ID tidak valid");
+      }
+
+      return apiFetch(`/api/imports/${importId}`, ImportDetailResponseSchema);
+    },
     enabled: !!importId,
   });
 }

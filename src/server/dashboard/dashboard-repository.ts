@@ -1,16 +1,29 @@
 import { db } from "@/db";
 import { dailyMetrics, hourlyMetricBreakdowns, hostShiftGmv, hosts } from "@/db/schema";
-import { eq, and, gte, lte, sql, desc } from "drizzle-orm";
+import { eq, and, gte, lte, sql, desc, type SQL } from "drizzle-orm";
 import type { DashboardFilter } from "@/lib/validators/dashboard";
 
-export async function getDailyMetrics(filters: DashboardFilter) {
-  const conditions = [];
+function buildDailyMetricConditions(filters: DashboardFilter): SQL[] {
+  const conditions: SQL[] = [];
   if (filters.brandId) conditions.push(eq(dailyMetrics.brandId, filters.brandId));
   if (filters.platformId) conditions.push(eq(dailyMetrics.platformId, filters.platformId));
   if (filters.channelId) conditions.push(eq(dailyMetrics.channelId, filters.channelId));
   if (filters.metric) conditions.push(eq(dailyMetrics.metric, filters.metric));
   if (filters.startDate) conditions.push(gte(dailyMetrics.date, filters.startDate));
   if (filters.endDate) conditions.push(lte(dailyMetrics.date, filters.endDate));
+  return conditions;
+}
+
+function buildHostGmvConditions(filters: DashboardFilter): SQL[] {
+  const conditions: SQL[] = [];
+  if (filters.platformId) conditions.push(eq(hostShiftGmv.platformId, filters.platformId));
+  if (filters.startDate) conditions.push(gte(hostShiftGmv.date, filters.startDate));
+  if (filters.endDate) conditions.push(lte(hostShiftGmv.date, filters.endDate));
+  return conditions;
+}
+
+export async function getDailyMetrics(filters: DashboardFilter) {
+  const conditions = buildDailyMetricConditions(filters);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -21,13 +34,7 @@ export async function getDailyMetrics(filters: DashboardFilter) {
 }
 
 export async function getDashboardSummary(filters: DashboardFilter) {
-  const conditions = [];
-  if (filters.brandId) conditions.push(eq(dailyMetrics.brandId, filters.brandId));
-  if (filters.platformId) conditions.push(eq(dailyMetrics.platformId, filters.platformId));
-  if (filters.channelId) conditions.push(eq(dailyMetrics.channelId, filters.channelId));
-  if (filters.metric) conditions.push(eq(dailyMetrics.metric, filters.metric));
-  if (filters.startDate) conditions.push(gte(dailyMetrics.date, filters.startDate));
-  if (filters.endDate) conditions.push(lte(dailyMetrics.date, filters.endDate));
+  const conditions = buildDailyMetricConditions(filters);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -50,13 +57,7 @@ export async function getDashboardSummary(filters: DashboardFilter) {
 }
 
 export async function getHourlyHeatmap(filters: DashboardFilter) {
-  const metricConditions = [];
-  if (filters.brandId) metricConditions.push(eq(dailyMetrics.brandId, filters.brandId));
-  if (filters.platformId) metricConditions.push(eq(dailyMetrics.platformId, filters.platformId));
-  if (filters.channelId) metricConditions.push(eq(dailyMetrics.channelId, filters.channelId));
-  if (filters.metric) metricConditions.push(eq(dailyMetrics.metric, filters.metric));
-  if (filters.startDate) metricConditions.push(gte(dailyMetrics.date, filters.startDate));
-  if (filters.endDate) metricConditions.push(lte(dailyMetrics.date, filters.endDate));
+  const metricConditions = buildDailyMetricConditions(filters);
 
   const metricWhere = metricConditions.length > 0 ? and(...metricConditions) : undefined;
 
@@ -73,10 +74,7 @@ export async function getHourlyHeatmap(filters: DashboardFilter) {
 }
 
 export async function getHostLeaderboard(filters: DashboardFilter) {
-  const conditions = [];
-  if (filters.platformId) conditions.push(eq(hostShiftGmv.platformId, filters.platformId));
-  if (filters.startDate) conditions.push(gte(hostShiftGmv.date, filters.startDate));
-  if (filters.endDate) conditions.push(lte(hostShiftGmv.date, filters.endDate));
+  const conditions = buildHostGmvConditions(filters);
 
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
@@ -94,13 +92,7 @@ export async function getHostLeaderboard(filters: DashboardFilter) {
 }
 
 export async function getBestHour(filters: DashboardFilter) {
-  const metricConditions = [];
-  if (filters.brandId) metricConditions.push(eq(dailyMetrics.brandId, filters.brandId));
-  if (filters.platformId) metricConditions.push(eq(dailyMetrics.platformId, filters.platformId));
-  if (filters.channelId) metricConditions.push(eq(dailyMetrics.channelId, filters.channelId));
-  if (filters.metric) metricConditions.push(eq(dailyMetrics.metric, filters.metric));
-  if (filters.startDate) metricConditions.push(gte(dailyMetrics.date, filters.startDate));
-  if (filters.endDate) metricConditions.push(lte(dailyMetrics.date, filters.endDate));
+  const metricConditions = buildDailyMetricConditions(filters);
 
   const metricWhere = metricConditions.length > 0 ? and(...metricConditions) : undefined;
 

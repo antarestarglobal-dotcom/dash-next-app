@@ -22,8 +22,8 @@ import { formatCurrency } from "@/lib/utils";
 interface DailyMetricRow {
   date: string;
   dayName: string | null;
-  total: string | null;
-  contributionPercent: string | null;
+  total: number | null;
+  contributionPercent: number | null;
 }
 
 type ChartTab = "trend" | "contribution" | "weekday";
@@ -68,7 +68,7 @@ export function DailyTrendChart({ data }: DailyTrendChartProps) {
     () =>
       data.map((r) => ({
         date: r.date.slice(5), // MM-DD
-        total: r.total ? parseFloat(r.total) : 0,
+        total: r.total ?? 0,
       })),
     [data],
   );
@@ -86,7 +86,7 @@ export function DailyTrendChart({ data }: DailyTrendChartProps) {
         .filter((r) => r.contributionPercent !== null)
         .map((r) => ({
           date: r.date.slice(5),
-          pct: r.contributionPercent ? parseFloat(r.contributionPercent) : 0,
+          pct: r.contributionPercent ?? 0,
         })),
     [data],
   );
@@ -103,9 +103,9 @@ export function DailyTrendChart({ data }: DailyTrendChartProps) {
   const weekdayData = useMemo(() => {
     const map = new Map<string, { sum: number; count: number }>();
     for (const r of data) {
-      if (!r.dayName || !r.total) continue;
+      if (!r.dayName || r.total === null) continue;
       const e = map.get(r.dayName) ?? { sum: 0, count: 0 };
-      e.sum += parseFloat(r.total);
+      e.sum += r.total;
       e.count += 1;
       map.set(r.dayName, e);
     }

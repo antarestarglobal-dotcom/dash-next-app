@@ -34,7 +34,7 @@ export default function ImportHistoryPage() {
     templateType,
   });
 
-  const imports = (data as unknown[]) ?? [];
+  const imports = data ?? [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -75,10 +75,12 @@ export default function ImportHistoryPage() {
       </div>
 
       {isLoading && <p className="text-sm text-neutral-500">Memuat data...</p>}
-      {isError && <BrutalAlert variant="error">{(error as Error).message}</BrutalAlert>}
-      {!isLoading && !isError && (
-        <ImportHistoryTable data={imports as Parameters<typeof ImportHistoryTable>[0]["data"]} />
+      {isError && (
+        <BrutalAlert variant="error">
+          {error instanceof Error ? error.message : "Terjadi kesalahan"}
+        </BrutalAlert>
       )}
+      {!isLoading && !isError && <ImportHistoryTable data={imports} />}
 
       <div className="flex gap-2 justify-center">
         <BrutalButton

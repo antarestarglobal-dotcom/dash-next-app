@@ -1,15 +1,15 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 import { apiFetch } from "@/lib/api-client";
+import { ConfirmImportResponseSchema } from "@/lib/validators/import";
 
 export function useConfirmImportMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: (importId: string) =>
-      apiFetch("/api/imports/confirm", z.object({ message: z.string() }), {
+      apiFetch("/api/imports/confirm", ConfirmImportResponseSchema, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ importId }),

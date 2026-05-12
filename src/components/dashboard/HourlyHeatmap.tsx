@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 interface HeatmapRow {
   date: string;
   hour: number;
-  valuePercent: string | null;
+  valuePercent: number | null;
 }
 
 interface HourlyHeatmapProps {
@@ -29,7 +29,7 @@ export function HourlyHeatmap({ data }: HourlyHeatmapProps) {
 
   const lookup = new Map<string, number>();
   for (const row of data) {
-    lookup.set(`${row.date}-${row.hour}`, row.valuePercent ? parseFloat(row.valuePercent) : 0);
+    lookup.set(`${row.date}-${row.hour}`, row.valuePercent ?? 0);
   }
 
   return (

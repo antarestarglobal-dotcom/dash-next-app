@@ -1,4 +1,7 @@
-import { parseSpreadsheetBufferPreview } from "@/lib/spreadsheet/parse-spreadsheet";
+import {
+  parseSpreadsheetBufferPreview,
+  type KnownSheetParseResult,
+} from "@/lib/spreadsheet/parse-spreadsheet";
 import { createImport } from "./import-repository";
 import type { TemplateType } from "@/lib/validators/import";
 
@@ -15,9 +18,24 @@ export interface ImportPreviewResult {
   validRows: number;
   rejectedRowsCount: number;
   warnings: string[];
-  previewRows: unknown[];
+  previewRows: Record<string, unknown>[];
   hasFatalError: boolean;
   errorMessage: string | null;
+}
+
+interface PreviewDerivedData {
+  period: string | null;
+  metric: string | null;
+  platform: string | null;
+  brand: string | null;
+  channel: string | null;
+  validRows: number;
+  rejectedRowsCount: number;
+  warnings: string[];
+  previewRows: Record<string, unknown>[];
+  rejectedRows: unknown[];
+  summary: Record<string, unknown>;
+  metadata: Record<string, unknown>;
 }
 
 export async function createImportPreview(
@@ -63,43 +81,31 @@ export async function createImportPreview(
       continue;
     }
 
-    const parsed = sheet.parsed;
-    const meta = (parsed.metadata ?? {}) as Record<string, string>;
-    const summary = (parsed.summary ?? {}) as Record<string, number | string | null>;
-    const warnings = (parsed.warnings ?? []) as string[];
-    const rejectedRows = (parsed.rejectedRows ?? []) as unknown[];
-
-    const validRows =
-      (summary.validRows as number) ??
-      (summary.dailyRows as number) ??
-      (summary.productRows as number) ??
-      0;
-
-    const previewRows = getPreviewRows(parsed, sheet.templateType);
+    const preview = buildPreviewData(sheet);
 
     const imp = await createImport({
       sourceName: fileName,
       sheetName: sheet.sheetName,
       templateType: sheet.templateType,
-      period: meta.period ?? (summary.startDate as string) ?? null,
-      brand: meta.brand ?? null,
-      platform: meta.platform ?? null,
-      channel: meta.channel ?? null,
-      metric: meta.metric ?? null,
+      period: preview.period ?? undefined,
+      brand: preview.brand ?? undefined,
+      platform: preview.platform ?? undefined,
+      channel: preview.channel ?? undefined,
+      metric: preview.metric ?? undefined,
       status: "preview",
       // rawJson stores the file so confirm can re-parse without re-upload
       rawJson: { fileBase64: rawBase64 },
       // detectedJson stores only preview-size data (no 218k rows)
       detectedJson: {
         templateType: sheet.templateType,
-        metadata: meta,
-        summary,
-        previewRows,
-        warnings,
-        rejectedRowsCount: (summary.rejectedRowsCount as number) ?? 0,
+        metadata: preview.metadata,
+        summary: preview.summary,
+        previewRows: preview.previewRows,
+        warnings: preview.warnings,
+        rejectedRowsCount: preview.rejectedRowsCount,
       },
-      warningJson: warnings,
-      rejectedRowsJson: rejectedRows,
+      warningJson: preview.warnings,
+      rejectedRowsJson: preview.rejectedRows,
     });
 
     results.push({
@@ -107,15 +113,15 @@ export async function createImportPreview(
       sourceName: fileName,
       sheetName: sheet.sheetName,
       templateType: sheet.templateType,
-      period: meta.period ?? null,
-      metric: meta.metric ?? null,
-      platform: meta.platform ?? null,
-      brand: meta.brand ?? null,
-      channel: meta.channel ?? null,
-      validRows,
-      rejectedRowsCount: (summary.rejectedRowsCount as number) ?? 0,
-      warnings,
-      previewRows,
+      period: preview.period,
+      metric: preview.metric,
+      platform: preview.platform,
+      brand: preview.brand,
+      channel: preview.channel,
+      validRows: preview.validRows,
+      rejectedRowsCount: preview.rejectedRowsCount,
+      warnings: preview.warnings,
+      previewRows: preview.previewRows,
       hasFatalError: false,
       errorMessage: null,
     });
@@ -124,18 +130,106 @@ export async function createImportPreview(
   return results;
 }
 
-function getPreviewRows(parsed: Record<string, unknown>, templateType: TemplateType): unknown[] {
-  switch (templateType) {
-    case "cohort_hourly":
-      return ((parsed.dailyRows as unknown[]) ?? []).slice(0, 10);
-    case "host_gmv":
-    case "host_okr":
-      return ((parsed.rows as unknown[]) ?? []).slice(0, 10);
-    case "order_detail":
-      return ((parsed.orders as unknown[]) ?? []).slice(0, 10);
-    case "master_product":
-      return ((parsed.products as unknown[]) ?? []).slice(0, 10);
-    default:
-      return [];
+function toPreviewRows<T extends Record<string, unknown>>(rows: T[]): Record<string, unknown>[] {
+  return rows.slice(0, 10);
+}
+
+function buildPreviewData(sheet: KnownSheetParseResult): PreviewDerivedData {
+  switch (sheet.templateType) {
+    case "cohort_hourly": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+
+      return {
+        period: parsed.metadata.period ?? parsed.summary.startDate ?? null,
+        metric: parsed.metadata.metric ?? null,
+        platform: parsed.metadata.platform ?? null,
+        brand: parsed.metadata.brand ?? null,
+        channel: parsed.metadata.channel ?? null,
+        validRows: parsed.summary.dailyRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.dailyRows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: parsed.metadata,
+      };
+    }
+    case "host_gmv": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+
+      return {
+        period: parsed.summary.startDate ?? null,
+        metric: "gmv",
+        platform: parsed.rows[0]?.platform ?? null,
+        brand: null,
+        channel: null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.rows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
+    case "order_detail": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+
+      return {
+        period: null,
+        metric: "net_sales",
+        platform: parsed.orders[0]?.platform ?? null,
+        brand: parsed.orders[0]?.brand ?? null,
+        channel: null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.orders),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
+    case "master_product": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+
+      return {
+        period: null,
+        metric: null,
+        platform: null,
+        brand: null,
+        channel: null,
+        validRows: parsed.summary.productRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.products),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
+    case "host_okr": {
+      const parsed = sheet.parsed;
+      if (!parsed) throw new Error("Parsed sheet data is missing");
+
+      return {
+        period: null,
+        metric: "okr",
+        platform: parsed.rows[0]?.platform ?? null,
+        brand: null,
+        channel: null,
+        validRows: parsed.summary.validRows,
+        rejectedRowsCount: parsed.summary.rejectedRowsCount,
+        warnings: parsed.warnings,
+        previewRows: toPreviewRows(parsed.rows),
+        rejectedRows: parsed.rejectedRows,
+        summary: parsed.summary,
+        metadata: {},
+      };
+    }
   }
 }

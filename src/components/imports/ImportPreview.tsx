@@ -2,33 +2,15 @@
 
 import { BrutalCard } from "@/components/ui/BrutalCard";
 import { BrutalButton } from "@/components/ui/BrutalButton";
-import { BrutalBadge } from "@/components/ui/BrutalBadge";
 import { BrutalAlert } from "@/components/ui/BrutalAlert";
 import { ImportWarnings } from "./ImportWarnings";
 import { PreviewRowsTable } from "./PreviewRowsTable";
 import { useConfirmImportMutation } from "@/hooks/use-confirm-import-mutation";
 import { formatNumber } from "@/lib/utils";
-
-interface PreviewItem {
-  importId: string;
-  sourceName: string;
-  sheetName: string;
-  templateType: string;
-  period: string | null;
-  metric: string | null;
-  platform: string | null;
-  brand: string | null;
-  channel: string | null;
-  validRows: number;
-  rejectedRowsCount: number;
-  warnings: string[];
-  previewRows: Record<string, unknown>[];
-  hasFatalError: boolean;
-  errorMessage: string | null;
-}
+import type { ImportPreviewResult } from "@/lib/validators/import";
 
 interface ImportPreviewProps {
-  previews: PreviewItem[];
+  previews: ImportPreviewResult[];
   onReset: () => void;
 }
 

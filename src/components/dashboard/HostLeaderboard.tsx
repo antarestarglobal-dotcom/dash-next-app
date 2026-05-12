@@ -1,34 +1,37 @@
 "use client";
 
 import { useMemo } from "react";
-import { createColumnHelper } from "@tanstack/react-table";
 import { BrutalCard } from "@/components/ui/BrutalCard";
-import { BrutalDataTable } from "@/components/ui/BrutalDataTable";
+import { BrutalDataTable, type BrutalColumn } from "@/components/ui/BrutalDataTable";
 import { formatCurrency } from "@/lib/utils";
 
 interface HostRow {
   hostId: number | null;
   hostName: string;
-  totalGmv: string;
+  totalGmv: number | null;
 }
 
-const columnHelper = createColumnHelper<HostRow & { rank: number }>();
+type RankedHostRow = HostRow & { rank: number };
 
-const columns = [
-  columnHelper.accessor("rank", {
+const columns: BrutalColumn<RankedHostRow>[] = [
+  {
+    id: "rank",
     header: "#",
-    cell: (i) => (
-      <span className="font-bold text-neutral-500 w-6 inline-block">{i.getValue()}</span>
-    ),
-  }),
-  columnHelper.accessor("hostName", {
+    cell: (row) => <span className="font-bold text-neutral-500 w-6 inline-block">{row.rank}</span>,
+    sortValue: (row) => row.rank,
+  },
+  {
+    id: "hostName",
     header: "Host",
-    cell: (i) => <span className="font-semibold">{i.getValue()}</span>,
-  }),
-  columnHelper.accessor("totalGmv", {
+    cell: (row) => <span className="font-semibold">{row.hostName}</span>,
+    sortValue: (row) => row.hostName,
+  },
+  {
+    id: "totalGmv",
     header: "Total GMV",
-    cell: (i) => formatCurrency(parseFloat(i.getValue())),
-  }),
+    cell: (row) => formatCurrency(row.totalGmv),
+    sortValue: (row) => row.totalGmv ?? null,
+  },
 ];
 
 interface HostLeaderboardProps {

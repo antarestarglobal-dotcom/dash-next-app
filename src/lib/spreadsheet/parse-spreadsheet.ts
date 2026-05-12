@@ -1,20 +1,43 @@
 import ExcelJS from "exceljs";
 import * as XLSX from "xlsx";
 import { detectTemplateBySheetName, detectTemplateByHeaderScan } from "./template-detector";
-import { parseCohortHourly } from "./parsers/cohort-hourly-parser";
-import { parseHostGmv } from "./parsers/host-gmv-parser";
-import { parseOrderDetail } from "./parsers/order-detail-parser";
-import { parseMasterProduct } from "./parsers/master-product-parser";
-import { parseHostOkr } from "./parsers/host-okr-parser";
-import type { TemplateType } from "../validators/import";
+import { parseCohortHourly, type CohortParseResult } from "./parsers/cohort-hourly-parser";
+import { parseHostGmv, type HostGmvParseResult } from "./parsers/host-gmv-parser";
+import { parseOrderDetail, type OrderDetailParseResult } from "./parsers/order-detail-parser";
+import {
+  parseMasterProduct,
+  type MasterProductParseResult,
+} from "./parsers/master-product-parser";
+import { parseHostOkr, type HostOkrParseResult } from "./parsers/host-okr-parser";
+import type { ParsedTemplateType, TemplateType } from "@/lib/domain/import-domain";
 
-export interface SheetParseResult {
-  sheetName: string;
-  templateType: TemplateType;
-  parsed: Record<string, unknown> | null;
-  error: string | null;
+export interface ParsedResultByTemplate {
+  cohort_hourly: CohortParseResult;
+  host_gmv: HostGmvParseResult;
+  order_detail: OrderDetailParseResult;
+  master_product: MasterProductParseResult;
+  host_okr: HostOkrParseResult;
 }
 
+export type KnownSheetParseResult = {
+  [K in ParsedTemplateType]: {
+    sheetName: string;
+    templateType: K;
+    parsed: ParsedResultByTemplate[K] | null;
+    error: string | null;
+  };
+}[ParsedTemplateType];
+
+export type UnknownSheetParseResult = {
+  sheetName: string;
+  templateType: "unknown";
+  parsed: null;
+  error: string | null;
+};
+
+export type SheetParseResult = KnownSheetParseResult | UnknownSheetParseResult;
+
+// Preview: read only first N rows per sheet to keep it fast
 const PREVIEW_ROW_LIMIT = 150;
 const MAX_FILE_SIZE_BYTES = 50 * 1024 * 1024; // 50 MB
 
@@ -260,8 +283,38 @@ export async function parseSpreadsheetBufferPreview(buffer: Buffer): Promise<She
     }
 
     try {
-      const parsed = parseRows(rows, templateType, true);
-      results.push({ sheetName, templateType, parsed, error: null });
+      switch (templateType) {
+        case "cohort_hourly":
+          results.push({
+            sheetName,
+            templateType,
+            parsed: parseCohortHourly(rows),
+            error: null,
+          });
+          break;
+        case "host_gmv":
+          results.push({ sheetName, templateType, parsed: parseHostGmv(rows), error: null });
+          break;
+        case "order_detail":
+          results.push({
+            sheetName,
+            templateType,
+            parsed: parseOrderDetail(rows, true, 50),
+            error: null,
+          });
+          break;
+        case "master_product":
+          results.push({
+            sheetName,
+            templateType,
+            parsed: parseMasterProduct(rows),
+            error: null,
+          });
+          break;
+        case "host_okr":
+          results.push({ sheetName, templateType, parsed: parseHostOkr(rows), error: null });
+          break;
+      }
     } catch (err) {
       results.push({
         sheetName,
@@ -278,8 +331,8 @@ export async function parseSpreadsheetBufferPreview(buffer: Buffer): Promise<She
 export async function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
-  templateType: TemplateType,
-): Promise<Record<string, unknown>> {
+  templateType: ParsedTemplateType,
+): Promise<ParsedResultByTemplate[ParsedTemplateType]> {
   const sig = detectFileSignature(buffer);
   if (sig === "unknown") throw new Error("Format file tidak dikenali");
 
@@ -287,5 +340,17 @@ export async function parseSpreadsheetSheetFull(
   const target = sheets.find((s) => s.name === sheetName);
   if (!target) throw new Error(`Sheet "${sheetName}" tidak ditemukan`);
 
-  return parseRows(target.rows, templateType, false);
+  const rows = target.rows;
+  switch (templateType) {
+    case "cohort_hourly":
+      return parseCohortHourly(rows);
+    case "host_gmv":
+      return parseHostGmv(rows);
+    case "order_detail":
+      return parseOrderDetail(rows, false);
+    case "master_product":
+      return parseMasterProduct(rows);
+    case "host_okr":
+      return parseHostOkr(rows);
+  }
 }

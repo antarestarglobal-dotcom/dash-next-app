@@ -4,7 +4,7 @@ import { normalizePlatformName, normalizeShift, isEmptyRow } from "../helpers/no
 import { findHeaderRow } from "../helpers/detect-header";
 import type { HostGmvRow } from "../../validators/import";
 
-interface HostGmvParseResult {
+export interface HostGmvParseResult {
   templateType: "host_gmv";
   summary: {
     validRows: number;

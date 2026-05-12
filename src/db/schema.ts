@@ -1,5 +1,6 @@
 import {
   pgTable,
+  pgEnum,
   serial,
   text,
   timestamp,
@@ -12,6 +13,10 @@ import {
   unique,
 } from "drizzle-orm/pg-core";
 import { sql } from "drizzle-orm";
+import { IMPORT_STATUS_VALUES, TEMPLATE_TYPE_VALUES } from "@/lib/domain/import-domain";
+
+export const templateTypeEnum = pgEnum("template_type", TEMPLATE_TYPE_VALUES);
+export const importStatusEnum = pgEnum("import_status", IMPORT_STATUS_VALUES);
 
 export const brands = pgTable("brands", {
   id: serial("id").primaryKey(),
@@ -43,13 +48,13 @@ export const spreadsheetImports = pgTable("spreadsheet_imports", {
   id: uuid("id").primaryKey().default(sql`gen_random_uuid()`),
   sourceName: text("source_name").notNull(),
   sheetName: text("sheet_name"),
-  templateType: text("template_type").notNull(),
+  templateType: templateTypeEnum("template_type").notNull(),
   period: text("period"),
   brand: text("brand"),
   platform: text("platform"),
   channel: text("channel"),
   metric: text("metric"),
-  status: text("status").notNull().default("preview"),
+  status: importStatusEnum("status").notNull().default("preview"),
   rawJson: jsonb("raw_json").notNull(),
   detectedJson: jsonb("detected_json").notNull(),
   warningJson: jsonb("warning_json"),

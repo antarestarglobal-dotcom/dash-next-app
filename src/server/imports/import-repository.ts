@@ -1,7 +1,15 @@
 import { db } from "@/db";
 import { spreadsheetImports } from "@/db/schema";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, and, type SQL } from "drizzle-orm";
 import type { ImportStatus, TemplateType } from "@/lib/validators/import";
+
+type JsonPayload =
+  | Record<string, unknown>
+  | unknown[]
+  | string
+  | number
+  | boolean
+  | null;
 
 export interface CreateImportInput {
   sourceName: string;
@@ -13,10 +21,10 @@ export interface CreateImportInput {
   channel?: string;
   metric?: string;
   status: ImportStatus;
-  rawJson: unknown;
-  detectedJson: unknown;
-  warningJson?: unknown;
-  rejectedRowsJson?: unknown;
+  rawJson: JsonPayload;
+  detectedJson: JsonPayload;
+  warningJson?: JsonPayload;
+  rejectedRowsJson?: JsonPayload;
   errorMessage?: string;
 }
 
@@ -33,22 +41,50 @@ export async function createImport(input: CreateImportInput) {
       channel: input.channel ?? null,
       metric: input.metric ?? null,
       status: input.status,
-      rawJson: input.rawJson as Record<string, unknown>,
-      detectedJson: input.detectedJson as Record<string, unknown>,
-      warningJson: input.warningJson ? (input.warningJson as Record<string, unknown>) : null,
-      rejectedRowsJson: input.rejectedRowsJson
-        ? (input.rejectedRowsJson as Record<string, unknown>)
-        : null,
+      rawJson: input.rawJson,
+      detectedJson: input.detectedJson,
+      warningJson: input.warningJson ?? null,
+      rejectedRowsJson: input.rejectedRowsJson ?? null,
       errorMessage: input.errorMessage ?? null,
     })
     .returning();
-  return row!;
+  if (!row) {
+    throw new Error("Gagal menyimpan import");
+  }
+
+  return row;
 }
 
 export async function getImportById(id: string) {
   const row = await db.query.spreadsheetImports.findFirst({
     where: eq(spreadsheetImports.id, id),
   });
+  return row ?? null;
+}
+
+export async function getImportPublicById(id: string) {
+  const row = await db.query.spreadsheetImports.findFirst({
+    where: eq(spreadsheetImports.id, id),
+    columns: {
+      id: true,
+      sourceName: true,
+      sheetName: true,
+      templateType: true,
+      period: true,
+      brand: true,
+      platform: true,
+      channel: true,
+      metric: true,
+      status: true,
+      detectedJson: true,
+      warningJson: true,
+      rejectedRowsJson: true,
+      errorMessage: true,
+      createdAt: true,
+      importedAt: true,
+    },
+  });
+
   return row ?? null;
 }
 
@@ -76,7 +112,7 @@ export async function listImports(options: {
   const { page, limit, status, templateType } = options;
   const offset = (page - 1) * limit;
 
-  const conditions = [];
+  const conditions: SQL[] = [];
   if (status) conditions.push(eq(spreadsheetImports.status, status));
   if (templateType) conditions.push(eq(spreadsheetImports.templateType, templateType));
 
@@ -84,6 +120,21 @@ export async function listImports(options: {
 
   const rows = await db.query.spreadsheetImports.findMany({
     where,
+    columns: {
+      id: true,
+      sourceName: true,
+      sheetName: true,
+      templateType: true,
+      period: true,
+      brand: true,
+      platform: true,
+      channel: true,
+      metric: true,
+      status: true,
+      errorMessage: true,
+      createdAt: true,
+      importedAt: true,
+    },
     orderBy: [desc(spreadsheetImports.createdAt)],
     limit,
     offset,

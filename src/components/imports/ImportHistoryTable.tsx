@@ -1,59 +1,56 @@
 "use client";
 
-import { createColumnHelper } from "@tanstack/react-table";
-import { BrutalDataTable } from "@/components/ui/BrutalDataTable";
+import { BrutalDataTable, type BrutalColumn } from "@/components/ui/BrutalDataTable";
 import { BrutalBadge } from "@/components/ui/BrutalBadge";
-import type { ImportStatus } from "@/lib/validators/import";
-
-interface ImportRow {
-  id: string;
-  sourceName: string;
-  sheetName: string | null;
-  templateType: string;
-  status: string;
-  createdAt: string | null;
-  importedAt: string | null;
-  errorMessage: string | null;
-}
+import type { ImportListItem } from "@/lib/validators/import";
 
 interface ImportHistoryTableProps {
-  data: ImportRow[];
+  data: ImportListItem[];
 }
 
-const columnHelper = createColumnHelper<ImportRow>();
-
-const columns = [
-  columnHelper.accessor("sourceName", { header: "File", cell: (i) => <span className="font-medium">{i.getValue()}</span> }),
-  columnHelper.accessor("sheetName", { header: "Sheet", cell: (i) => i.getValue() ?? "-" }),
-  columnHelper.accessor("templateType", { header: "Template" }),
-  columnHelper.accessor("status", {
+const columns: BrutalColumn<ImportListItem>[] = [
+  {
+    id: "sourceName",
+    header: "File",
+    cell: (row) => <span className="font-medium">{row.sourceName}</span>,
+    sortValue: (row) => row.sourceName,
+  },
+  {
+    id: "sheetName",
+    header: "Sheet",
+    cell: (row) => row.sheetName ?? "-",
+    sortValue: (row) => row.sheetName ?? "",
+  },
+  {
+    id: "templateType",
+    header: "Template",
+    cell: (row) => row.templateType,
+    sortValue: (row) => row.templateType,
+  },
+  {
+    id: "status",
     header: "Status",
-    cell: (i) => {
-      const status = i.getValue() as ImportStatus;
-      return <BrutalBadge variant={status}>{status}</BrutalBadge>;
-    },
-  }),
-  columnHelper.accessor("createdAt", {
+    cell: (row) => <BrutalBadge variant={row.status}>{row.status}</BrutalBadge>,
+    sortValue: (row) => row.status,
+  },
+  {
+    id: "createdAt",
     header: "Dibuat",
-    cell: (i) => {
-      const v = i.getValue();
-      return v ? new Date(v).toLocaleString("id-ID") : "-";
-    },
-  }),
-  columnHelper.accessor("importedAt", {
+    cell: (row) => (row.createdAt ? new Date(row.createdAt).toLocaleString("id-ID") : "-"),
+    sortValue: (row) => row.createdAt ?? "",
+  },
+  {
+    id: "importedAt",
     header: "Diimport",
-    cell: (i) => {
-      const v = i.getValue();
-      return v ? new Date(v).toLocaleString("id-ID") : "-";
-    },
-  }),
-  columnHelper.accessor("errorMessage", {
+    cell: (row) => (row.importedAt ? new Date(row.importedAt).toLocaleString("id-ID") : "-"),
+    sortValue: (row) => row.importedAt ?? "",
+  },
+  {
+    id: "errorMessage",
     header: "Error",
-    cell: (i) => {
-      const v = i.getValue();
-      return v ? <span className="text-red-700 text-xs">{v}</span> : "-";
-    },
-  }),
+    cell: (row) => (row.errorMessage ? <span className="text-red-700 text-xs">{row.errorMessage}</span> : "-"),
+    sortValue: (row) => row.errorMessage ?? "",
+  },
 ];
 
 export function ImportHistoryTable({ data }: ImportHistoryTableProps) {
