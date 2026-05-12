@@ -1,17 +1,16 @@
 import { z } from "zod";
+import {
+  IMPORT_STATUS_VALUES,
+  TEMPLATE_TYPE_VALUES,
+  type ImportStatus as DomainImportStatus,
+  type TemplateType as DomainTemplateType,
+} from "@/lib/domain/import-domain";
 
-export const ImportStatusSchema = z.enum(["preview", "imported", "failed"]);
-export type ImportStatus = z.infer<typeof ImportStatusSchema>;
+export const ImportStatusSchema = z.enum(IMPORT_STATUS_VALUES);
+export type ImportStatus = DomainImportStatus;
 
-export const TemplateTypeSchema = z.enum([
-  "cohort_hourly",
-  "host_gmv",
-  "order_detail",
-  "master_product",
-  "host_okr",
-  "unknown",
-]);
-export type TemplateType = z.infer<typeof TemplateTypeSchema>;
+export const TemplateTypeSchema = z.enum(TEMPLATE_TYPE_VALUES);
+export type TemplateType = DomainTemplateType;
 
 export const CohortMetadataSchema = z.object({
   period: z.string(),
@@ -112,6 +111,43 @@ export const ImportPreviewResultSchema = z.object({
   errorMessage: z.string().nullable(),
 });
 
+export const ImportPreviewResponseSchema = z.array(ImportPreviewResultSchema);
+
+const NullableDateTimeSchema = z.preprocess(
+  (value) => (value instanceof Date ? value.toISOString() : value),
+  z.string().nullable(),
+);
+
+export const ImportListItemSchema = z.object({
+  id: z.string().uuid(),
+  sourceName: z.string(),
+  sheetName: z.string().nullable(),
+  templateType: TemplateTypeSchema,
+  period: z.string().nullable(),
+  brand: z.string().nullable(),
+  platform: z.string().nullable(),
+  channel: z.string().nullable(),
+  metric: z.string().nullable(),
+  status: ImportStatusSchema,
+  errorMessage: z.string().nullable(),
+  createdAt: NullableDateTimeSchema,
+  importedAt: NullableDateTimeSchema,
+});
+
+export const ImportListResponseSchema = z.array(ImportListItemSchema);
+
+export const ImportDetailSchema = ImportListItemSchema.extend({
+  detectedJson: z.unknown(),
+  warningJson: z.unknown().nullable(),
+  rejectedRowsJson: z.unknown().nullable(),
+});
+
+export const ImportDetailResponseSchema = ImportDetailSchema;
+
+export const ConfirmImportResponseSchema = z.object({
+  message: z.string(),
+});
+
 export type CohortMetadata = z.infer<typeof CohortMetadataSchema>;
 export type CohortDailyRow = z.infer<typeof CohortDailyRowSchema>;
 export type HostGmvRow = z.infer<typeof HostGmvRowSchema>;
@@ -120,3 +156,5 @@ export type ProductRow = z.infer<typeof ProductRowSchema>;
 export type BundleRow = z.infer<typeof BundleRowSchema>;
 export type HostOkrRow = z.infer<typeof HostOkrRowSchema>;
 export type ImportPreviewResult = z.infer<typeof ImportPreviewResultSchema>;
+export type ImportListItem = z.infer<typeof ImportListItemSchema>;
+export type ImportDetail = z.infer<typeof ImportDetailSchema>;

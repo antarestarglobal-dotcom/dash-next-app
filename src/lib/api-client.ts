@@ -31,11 +31,11 @@ async function safeParseJson(res: Response): Promise<unknown> {
   }
 }
 
-export async function apiFetch<T>(
+export async function apiFetch<TSchema extends z.ZodTypeAny>(
   input: string | URL,
-  dataSchema: z.ZodType<T>,
+  dataSchema: TSchema,
   init?: RequestInit,
-): Promise<T> {
+): Promise<z.output<TSchema>> {
   let res: Response;
 
   try {

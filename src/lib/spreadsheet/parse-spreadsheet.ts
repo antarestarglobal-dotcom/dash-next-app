@@ -1,18 +1,40 @@
 import * as XLSX from "xlsx";
 import { detectTemplateBySheetName, detectTemplateByHeaderScan } from "./template-detector";
-import { parseCohortHourly } from "./parsers/cohort-hourly-parser";
-import { parseHostGmv } from "./parsers/host-gmv-parser";
-import { parseOrderDetail } from "./parsers/order-detail-parser";
-import { parseMasterProduct } from "./parsers/master-product-parser";
-import { parseHostOkr } from "./parsers/host-okr-parser";
-import type { TemplateType } from "../validators/import";
+import { parseCohortHourly, type CohortParseResult } from "./parsers/cohort-hourly-parser";
+import { parseHostGmv, type HostGmvParseResult } from "./parsers/host-gmv-parser";
+import { parseOrderDetail, type OrderDetailParseResult } from "./parsers/order-detail-parser";
+import {
+  parseMasterProduct,
+  type MasterProductParseResult,
+} from "./parsers/master-product-parser";
+import { parseHostOkr, type HostOkrParseResult } from "./parsers/host-okr-parser";
+import type { ParsedTemplateType } from "@/lib/domain/import-domain";
 
-export interface SheetParseResult {
-  sheetName: string;
-  templateType: TemplateType;
-  parsed: Record<string, unknown> | null;
-  error: string | null;
+export interface ParsedResultByTemplate {
+  cohort_hourly: CohortParseResult;
+  host_gmv: HostGmvParseResult;
+  order_detail: OrderDetailParseResult;
+  master_product: MasterProductParseResult;
+  host_okr: HostOkrParseResult;
 }
+
+export type KnownSheetParseResult = {
+  [K in ParsedTemplateType]: {
+    sheetName: string;
+    templateType: K;
+    parsed: ParsedResultByTemplate[K] | null;
+    error: string | null;
+  };
+}[ParsedTemplateType];
+
+export type UnknownSheetParseResult = {
+  sheetName: string;
+  templateType: "unknown";
+  parsed: null;
+  error: string | null;
+};
+
+export type SheetParseResult = KnownSheetParseResult | UnknownSheetParseResult;
 
 // Preview: read only first N rows per sheet to keep it fast
 const PREVIEW_ROW_LIMIT = 150;
@@ -146,32 +168,41 @@ export function parseSpreadsheetBufferPreview(buffer: Buffer): SheetParseResult[
     }
 
     try {
-      let parsed: Record<string, unknown>;
-
-      switch (templateType) {
-        case "cohort_hourly":
-          parsed = parseCohortHourly(rows) as unknown as Record<string, unknown>;
-          break;
-        case "host_gmv":
-          parsed = parseHostGmv(rows) as unknown as Record<string, unknown>;
-          break;
-        case "order_detail":
-          parsed = parseOrderDetail(rows, true, 50) as unknown as Record<string, unknown>;
-          break;
-        case "master_product":
-          parsed = parseMasterProduct(rows) as unknown as Record<string, unknown>;
-          break;
-        case "host_okr":
-          parsed = parseHostOkr(rows) as unknown as Record<string, unknown>;
-          break;
-        default:
-          parsed = {};
-      }
-
-      results.push({ sheetName, templateType, parsed, error: null });
-    } catch (err) {
-      results.push({
-        sheetName,
+        switch (templateType) {
+          case "cohort_hourly":
+            results.push({
+              sheetName,
+              templateType,
+              parsed: parseCohortHourly(rows),
+              error: null,
+            });
+            break;
+          case "host_gmv":
+            results.push({ sheetName, templateType, parsed: parseHostGmv(rows), error: null });
+            break;
+          case "order_detail":
+            results.push({
+              sheetName,
+              templateType,
+              parsed: parseOrderDetail(rows, true, 50),
+              error: null,
+            });
+            break;
+          case "master_product":
+            results.push({
+              sheetName,
+              templateType,
+              parsed: parseMasterProduct(rows),
+              error: null,
+            });
+            break;
+          case "host_okr":
+            results.push({ sheetName, templateType, parsed: parseHostOkr(rows), error: null });
+            break;
+        }
+      } catch (err) {
+        results.push({
+          sheetName,
         templateType,
         parsed: null,
         error: err instanceof Error ? err.message : "Parse error",
@@ -186,8 +217,33 @@ export function parseSpreadsheetBufferPreview(buffer: Buffer): SheetParseResult[
 export function parseSpreadsheetSheetFull(
   buffer: Buffer,
   sheetName: string,
-  templateType: TemplateType,
-): Record<string, unknown> {
+  templateType: "cohort_hourly",
+): ParsedResultByTemplate["cohort_hourly"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "host_gmv",
+): ParsedResultByTemplate["host_gmv"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "order_detail",
+): ParsedResultByTemplate["order_detail"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "master_product",
+): ParsedResultByTemplate["master_product"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: "host_okr",
+): ParsedResultByTemplate["host_okr"];
+export function parseSpreadsheetSheetFull(
+  buffer: Buffer,
+  sheetName: string,
+  templateType: ParsedTemplateType,
+): ParsedResultByTemplate[ParsedTemplateType] {
   const workbook = safeReadWorkbook(buffer);
   const sheet = workbook.Sheets[sheetName];
   if (!sheet) throw new Error(`Sheet "${sheetName}" tidak ditemukan`);
@@ -196,16 +252,14 @@ export function parseSpreadsheetSheetFull(
 
   switch (templateType) {
     case "cohort_hourly":
-      return parseCohortHourly(rows) as unknown as Record<string, unknown>;
+      return parseCohortHourly(rows);
     case "host_gmv":
-      return parseHostGmv(rows) as unknown as Record<string, unknown>;
+      return parseHostGmv(rows);
     case "order_detail":
-      return parseOrderDetail(rows, false) as unknown as Record<string, unknown>;
+      return parseOrderDetail(rows, false);
     case "master_product":
-      return parseMasterProduct(rows) as unknown as Record<string, unknown>;
+      return parseMasterProduct(rows);
     case "host_okr":
-      return parseHostOkr(rows) as unknown as Record<string, unknown>;
-    default:
-      throw new Error(`Template type "${templateType}" tidak didukung`);
+      return parseHostOkr(rows);
   }
 }

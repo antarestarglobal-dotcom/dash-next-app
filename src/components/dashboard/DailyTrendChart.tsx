@@ -14,7 +14,7 @@ import { formatCurrency } from "@/lib/utils";
 
 interface DailyMetricRow {
   date: string;
-  total: string | null;
+  total: number | null;
 }
 
 interface DailyTrendChartProps {
@@ -24,7 +24,7 @@ interface DailyTrendChartProps {
 export function DailyTrendChart({ data }: DailyTrendChartProps) {
   const chartData = data.map((row) => ({
     date: row.date,
-    total: row.total ? parseFloat(row.total) : 0,
+    total: row.total ?? 0,
   }));
 
   return (

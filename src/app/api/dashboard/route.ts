@@ -6,8 +6,9 @@ import {
   getHostLeaderboard,
   getBestHour,
 } from "@/server/dashboard/dashboard-repository";
-import { DashboardFilterSchema } from "@/lib/validators/dashboard";
+import { DashboardFilterSchema, DashboardResponseSchema } from "@/lib/validators/dashboard";
 import { apiSuccess, apiError } from "@/lib/validators/api";
+import { DomainError, getDomainErrorStatus, isDomainError } from "@/lib/errors/domain-error";
 import { logError, devDetails } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
@@ -17,7 +18,9 @@ export async function GET(req: NextRequest) {
     const parsed = DashboardFilterSchema.safeParse(query);
 
     if (!parsed.success) {
-      return NextResponse.json(apiError("INVALID_FILTER", "Filter tidak valid"), { status: 400 });
+      throw new DomainError("INVALID_FILTER_PARAMS", "Filter tidak valid", {
+        issues: parsed.error.flatten(),
+      });
     }
 
     const filters = parsed.data;
@@ -30,11 +33,28 @@ export async function GET(req: NextRequest) {
       getBestHour(filters),
     ]);
 
-    return NextResponse.json(
-      apiSuccess({ summary, dailyMetrics: dailyData, heatmap, hostLeaderboard, bestHour }),
-    );
+    const response = DashboardResponseSchema.parse({
+      summary,
+      dailyMetrics: dailyData,
+      heatmap,
+      hostLeaderboard,
+      bestHour,
+    });
+
+    return NextResponse.json(apiSuccess(response));
   } catch (err) {
     logError("GET /api/dashboard", err);
+
+    if (isDomainError(err)) {
+      return NextResponse.json(
+        {
+          ...apiError(err.code, err.message, err.details),
+          ...(devDetails(err) && { debug: devDetails(err) }),
+        },
+        { status: getDomainErrorStatus(err.code) },
+      );
+    }
+
     return NextResponse.json(
       {
         ...apiError("INTERNAL_ERROR", err instanceof Error ? err.message : "Internal server error"),

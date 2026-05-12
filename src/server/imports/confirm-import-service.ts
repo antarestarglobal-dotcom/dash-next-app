@@ -17,9 +17,34 @@ import { eq, inArray, sql } from "drizzle-orm";
 import { getImportById, updateImportStatus } from "./import-repository";
 import { parseSpreadsheetSheetFull } from "@/lib/spreadsheet/parse-spreadsheet";
 import { logInfo, logWarn, logError } from "@/lib/logger";
-import type { TemplateType } from "@/lib/validators/import";
+import { z } from "zod";
+import { DomainError } from "@/lib/errors/domain-error";
+import type {
+  CohortParseResult,
+} from "@/lib/spreadsheet/parsers/cohort-hourly-parser";
+import type { HostGmvParseResult } from "@/lib/spreadsheet/parsers/host-gmv-parser";
+import type { OrderDetailParseResult } from "@/lib/spreadsheet/parsers/order-detail-parser";
+import type { MasterProductParseResult } from "@/lib/spreadsheet/parsers/master-product-parser";
+import type { HostOkrParseResult } from "@/lib/spreadsheet/parsers/host-okr-parser";
+import type { ParsedTemplateType } from "@/lib/domain/import-domain";
 
 const CHUNK_SIZE = 2000;
+const RawImportPayloadSchema = z.object({ fileBase64: z.string().min(1) });
+
+function getRequiredMapValue(
+  map: Map<string, number>,
+  key: string,
+  label: string,
+): number {
+  const value = map.get(key);
+  if (!value) {
+    throw new DomainError("IMPORT_REFERENCE_NOT_FOUND", `${label} "${key}" tidak ditemukan`, {
+      label,
+      key,
+    });
+  }
+  return value;
+}
 
 // Batch upsert helpers — insert all unique names at once, then fetch IDs in one query.
 
@@ -85,17 +110,11 @@ function deduplicateBy<T>(rows: T[], key: (row: T) => string): T[] {
 }
 
 async function confirmCohortHourly(
-  parsed: Record<string, unknown>,
+  parsed: CohortParseResult,
   importId: string,
 ): Promise<void> {
-  const meta = parsed.metadata as Record<string, string>;
-  const dailyRowsRaw = parsed.dailyRows as Array<{
-    date: string;
-    dayName: string;
-    total: number | null;
-    contributionPercent: number | null;
-    hours: Array<{ hour: number; valuePercent: number | null }>;
-  }>;
+  const meta = parsed.metadata;
+  const dailyRowsRaw = parsed.dailyRows;
 
   // Deduplicate by date before bulk upsert
   const dailyRowsData = deduplicateBy(dailyRowsRaw, (r) => r.date);
@@ -104,9 +123,12 @@ async function confirmCohortHourly(
   const brandMap = await batchUpsertBrands([meta.brand ?? "Unknown"]);
   const platformMap = await batchUpsertPlatforms([meta.platform ?? "unknown"]);
   const channelMap = await batchUpsertChannels([meta.channel ?? "Unknown"]);
-  const brandId = brandMap.get(meta.brand ?? "Unknown")!;
-  const platformId = platformMap.get(meta.platform ?? "unknown")!;
-  const channelId = channelMap.get(meta.channel ?? "Unknown")!;
+  const brandKey = meta.brand ?? "Unknown";
+  const platformKey = meta.platform ?? "unknown";
+  const channelKey = meta.channel ?? "Unknown";
+  const brandId = getRequiredMapValue(brandMap, brandKey, "Brand");
+  const platformId = getRequiredMapValue(platformMap, platformKey, "Platform");
+  const channelId = getRequiredMapValue(channelMap, channelKey, "Channel");
   const metric = meta.metric ?? "net_sales";
 
   const upserted = await db
@@ -171,16 +193,10 @@ async function confirmCohortHourly(
 }
 
 async function confirmHostGmv(
-  parsed: Record<string, unknown>,
+  parsed: HostGmvParseResult,
   importId: string,
 ): Promise<void> {
-  const rawRows = parsed.rows as Array<{
-    host: string;
-    date: string;
-    platform: string;
-    shift: string;
-    gmv: number | null;
-  }>;
+  const rawRows = parsed.rows;
 
   // Deduplicate by unique constraint: host+platform+date+shift
   const rows = deduplicateBy(rawRows, (r) => `${r.host}|${r.platform}|${r.date}|${r.shift}`);
@@ -196,8 +212,8 @@ async function confirmHostGmv(
       .insert(hostShiftGmv)
       .values(
         chunk.map((row) => ({
-          hostId: hostMap.get(row.host)!,
-          platformId: platformMap.get(row.platform)!,
+          hostId: getRequiredMapValue(hostMap, row.host, "Host"),
+          platformId: getRequiredMapValue(platformMap, row.platform, "Platform"),
           date: row.date,
           shift: row.shift,
           gmv: row.gmv?.toString() ?? null,
@@ -216,19 +232,10 @@ async function confirmHostGmv(
 }
 
 async function confirmOrderDetail(
-  parsed: Record<string, unknown>,
+  parsed: OrderDetailParseResult,
   importId: string,
 ): Promise<void> {
-  const orderRows = parsed.orders as Array<{
-    orderDate: string;
-    orderTime: string | null;
-    brand: string | null;
-    platform: string | null;
-    invoice: string;
-    netSales: number | null;
-    sku: string | null;
-    quantity: number | null;
-  }>;
+  const orderRows = parsed.orders;
 
   logInfo("confirmOrderDetail", `Processing ${orderRows.length} rows`, { importId });
 
@@ -263,28 +270,16 @@ async function confirmOrderDetail(
 }
 
 async function confirmMasterProduct(
-  parsed: Record<string, unknown>,
+  parsed: MasterProductParseResult,
   importId: string,
 ): Promise<void> {
-  const productRowsRaw = parsed.products as Array<{
-    category: string | null;
-    productName: string;
-    parentSku: string | null;
-    variantName: string | null;
-    variantSku: string;
-    hpp: number | null;
-    sellingPrice: number | null;
-  }>;
+  const productRowsRaw = parsed.products;
 
   // Deduplicate products by variantSku
   const productRows = deduplicateBy(productRowsRaw, (r) => r.variantSku);
   logInfo("confirmMasterProduct", `Processing ${productRows.length} products`, { importId });
 
-  const bundleRows = parsed.bundles as Array<{
-    bundleName: string;
-    bundleCode: string;
-    items: Array<{ productName: string; quantity: number }>;
-  }>;
+  const bundleRows = parsed.bundles;
 
   for (let i = 0; i < productRows.length; i += CHUNK_SIZE) {
     const chunk = productRows.slice(i, i + CHUNK_SIZE);
@@ -332,11 +327,15 @@ async function confirmMasterProduct(
       })
       .returning();
 
-    await db.delete(bundleItems).where(eq(bundleItems.bundleId, upserted!.id));
+    if (!upserted) {
+      throw new Error(`Gagal upsert bundle ${bundle.bundleCode}`);
+    }
+
+    await db.delete(bundleItems).where(eq(bundleItems.bundleId, upserted.id));
     if (bundle.items.length > 0) {
       await db.insert(bundleItems).values(
         bundle.items.map((item) => ({
-          bundleId: upserted!.id,
+          bundleId: upserted.id,
           productName: item.productName,
           quantity: item.quantity,
         })),
@@ -346,17 +345,10 @@ async function confirmMasterProduct(
 }
 
 async function confirmHostOkr(
-  parsed: Record<string, unknown>,
+  parsed: HostOkrParseResult,
   importId: string,
 ): Promise<void> {
-  const rawRows = parsed.rows as Array<{
-    host: string;
-    date: string;
-    platform: string;
-    shift: string;
-    ctr: number | null;
-    aov: number | null;
-  }>;
+  const rawRows = parsed.rows;
 
   // Deduplicate by unique constraint: host+platform+date+shift
   const rows = deduplicateBy(rawRows, (r) => `${r.host}|${r.platform}|${r.date}|${r.shift}`);
@@ -372,8 +364,8 @@ async function confirmHostOkr(
       .insert(hostOkr)
       .values(
         chunk.map((row) => ({
-          hostId: hostMap.get(row.host)!,
-          platformId: platformMap.get(row.platform)!,
+          hostId: getRequiredMapValue(hostMap, row.host, "Host"),
+          platformId: getRequiredMapValue(platformMap, row.platform, "Platform"),
           date: row.date,
           shift: row.shift,
           ctr: row.ctr?.toString() ?? null,
@@ -397,44 +389,69 @@ export async function confirmImport(importId: string): Promise<void> {
   const t0 = Date.now();
   const importRecord = await getImportById(importId);
 
-  if (!importRecord) throw new Error("Import tidak ditemukan");
-  if (importRecord.status === "imported") throw new Error("Import sudah dikonfirmasi");
-  if (importRecord.status === "failed") throw new Error("Import gagal, tidak bisa dikonfirmasi");
+  if (!importRecord) throw new DomainError("IMPORT_NOT_FOUND", "Import tidak ditemukan", { importId });
+  if (importRecord.status === "imported") {
+    throw new DomainError("IMPORT_ALREADY_CONFIRMED", "Import sudah dikonfirmasi", { importId });
+  }
+  if (importRecord.status === "failed") {
+    throw new DomainError("IMPORT_FAILED_STATE", "Import gagal, tidak bisa dikonfirmasi", {
+      importId,
+    });
+  }
+  if (importRecord.templateType === "unknown") {
+    throw new DomainError("IMPORT_UNKNOWN_TEMPLATE", "Template type unknown tidak dapat dikonfirmasi", {
+      importId,
+      templateType: importRecord.templateType,
+    });
+  }
 
-  const templateType = importRecord.templateType as TemplateType;
-  const rawJson = importRecord.rawJson as Record<string, unknown>;
+  const templateType: ParsedTemplateType = importRecord.templateType;
 
   logInfo("confirmImport", `Starting confirm`, { importId, templateType });
 
-  const fileBase64 = rawJson.fileBase64 as string | undefined;
-  if (!fileBase64) throw new Error("File original tidak ditemukan, upload ulang untuk import");
+  const parsedRaw = RawImportPayloadSchema.safeParse(importRecord.rawJson);
+  if (!parsedRaw.success) {
+    throw new DomainError(
+      "IMPORT_ORIGINAL_FILE_MISSING",
+      "File original tidak ditemukan, upload ulang untuk import",
+      { importId },
+    );
+  }
+
+  const fileBase64 = parsedRaw.data.fileBase64;
 
   const fileBuffer = Buffer.from(fileBase64, "base64");
   const sheetName = importRecord.sheetName ?? "";
 
-  const parsed = parseSpreadsheetSheetFull(fileBuffer, sheetName, templateType);
-  logInfo("confirmImport", `Parse complete`, { importId, templateType });
-
   try {
     switch (templateType) {
       case "cohort_hourly":
-        await confirmCohortHourly(parsed, importId);
+        await confirmCohortHourly(
+          parseSpreadsheetSheetFull(fileBuffer, sheetName, "cohort_hourly"),
+          importId,
+        );
         break;
       case "host_gmv":
-        await confirmHostGmv(parsed, importId);
+        await confirmHostGmv(parseSpreadsheetSheetFull(fileBuffer, sheetName, "host_gmv"), importId);
         break;
       case "order_detail":
-        await confirmOrderDetail(parsed, importId);
+        await confirmOrderDetail(
+          parseSpreadsheetSheetFull(fileBuffer, sheetName, "order_detail"),
+          importId,
+        );
         break;
       case "master_product":
-        await confirmMasterProduct(parsed, importId);
+        await confirmMasterProduct(
+          parseSpreadsheetSheetFull(fileBuffer, sheetName, "master_product"),
+          importId,
+        );
         break;
       case "host_okr":
-        await confirmHostOkr(parsed, importId);
+        await confirmHostOkr(parseSpreadsheetSheetFull(fileBuffer, sheetName, "host_okr"), importId);
         break;
-      default:
-        throw new Error(`Template type "${templateType}" tidak didukung`);
     }
+
+    logInfo("confirmImport", `Parse complete`, { importId, templateType });
 
     await updateImportStatus(importId, "imported");
     logInfo("confirmImport", `Done in ${Date.now() - t0}ms`, { importId, templateType });

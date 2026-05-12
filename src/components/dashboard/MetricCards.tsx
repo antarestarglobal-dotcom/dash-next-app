@@ -1,4 +1,3 @@
-import { BrutalCard } from "@/components/ui/BrutalCard";
 import { TrendingUp, Calendar, Clock, BarChart2 } from "lucide-react";
 import { formatCurrency, formatNumber } from "@/lib/utils";
 

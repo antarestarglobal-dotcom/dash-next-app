@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { listImports } from "@/server/imports/import-repository";
-import { ImportListQuerySchema } from "@/lib/validators/import";
+import { ImportListQuerySchema, ImportListResponseSchema } from "@/lib/validators/import";
 import { apiSuccess, apiError } from "@/lib/validators/api";
+import { DomainError, getDomainErrorStatus, isDomainError } from "@/lib/errors/domain-error";
 import { logError, devDetails } from "@/lib/logger";
 
 export async function GET(req: NextRequest) {
@@ -11,16 +12,27 @@ export async function GET(req: NextRequest) {
     const parsed = ImportListQuerySchema.safeParse(query);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        apiError("INVALID_QUERY", "Query params tidak valid"),
-        { status: 400 },
-      );
+      throw new DomainError("INVALID_QUERY_PARAMS", "Query params tidak valid", {
+        issues: parsed.error.flatten(),
+      });
     }
 
     const imports = await listImports(parsed.data);
-    return NextResponse.json(apiSuccess(imports));
+    const response = ImportListResponseSchema.parse(imports);
+    return NextResponse.json(apiSuccess(response));
   } catch (err) {
     logError("GET /api/imports", err);
+
+    if (isDomainError(err)) {
+      return NextResponse.json(
+        {
+          ...apiError(err.code, err.message, err.details),
+          ...(devDetails(err) && { debug: devDetails(err) }),
+        },
+        { status: getDomainErrorStatus(err.code) },
+      );
+    }
+
     return NextResponse.json(
       {
         ...apiError("INTERNAL_ERROR", err instanceof Error ? err.message : "Internal server error"),

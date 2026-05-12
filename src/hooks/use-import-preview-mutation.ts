@@ -1,9 +1,8 @@
 "use client";
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { z } from "zod";
 import { apiFetch } from "@/lib/api-client";
-import { ImportPreviewResultSchema } from "@/lib/validators/import";
+import { ImportPreviewResponseSchema } from "@/lib/validators/import";
 
 export function useImportPreviewMutation() {
   const queryClient = useQueryClient();
@@ -12,7 +11,7 @@ export function useImportPreviewMutation() {
     mutationFn: (file: File) => {
       const formData = new FormData();
       formData.append("file", file);
-      return apiFetch("/api/imports/preview", z.array(ImportPreviewResultSchema), {
+      return apiFetch("/api/imports/preview", ImportPreviewResponseSchema, {
         method: "POST",
         body: formData,
       });

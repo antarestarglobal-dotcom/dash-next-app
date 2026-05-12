@@ -11,19 +11,9 @@ import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 import { BrutalAlert } from "@/components/ui/BrutalAlert";
 import type { DashboardFilter } from "@/lib/validators/dashboard";
 
-interface DashboardData {
-  summary: { totalMtd: number; dailyAvg: number; bestDayTotal: number; rowCount: number };
-  dailyMetrics: unknown[];
-  heatmap: unknown[];
-  hostLeaderboard: unknown[];
-  bestHour: { hour: number | null; avgPercent: number };
-}
-
 export default function DashboardPage() {
   const [filters, setFilters] = useState<DashboardFilter>({});
   const { data, isLoading, isError, error } = useDashboardQuery(filters);
-
-  const dashboard = data as DashboardData | undefined;
 
   return (
     <div className="flex flex-col gap-6">
@@ -38,36 +28,28 @@ export default function DashboardPage() {
       </div>
 
       {isLoading && <p className="text-sm text-neutral-500">Memuat dashboard...</p>}
-      {isError && <BrutalAlert variant="error">{(error as Error).message}</BrutalAlert>}
+      {isError && (
+        <BrutalAlert variant="error">
+          {error instanceof Error ? error.message : "Terjadi kesalahan"}
+        </BrutalAlert>
+      )}
 
-      {!isLoading && !isError && dashboard && (
+      {!isLoading && !isError && data && (
         <>
-          <MetricCards summary={dashboard.summary} bestHour={dashboard.bestHour} />
+          <MetricCards summary={data.summary} bestHour={data.bestHour} />
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            <DailyTrendChart
-              data={dashboard.dailyMetrics as Parameters<typeof DailyTrendChart>[0]["data"]}
-            />
-            <HostLeaderboard
-              data={
-                dashboard.hostLeaderboard as Parameters<typeof HostLeaderboard>[0]["data"]
-              }
-            />
+            <DailyTrendChart data={data.dailyMetrics} />
+            <HostLeaderboard data={data.hostLeaderboard} />
           </div>
 
-          <HourlyHeatmap
-            data={dashboard.heatmap as Parameters<typeof HourlyHeatmap>[0]["data"]}
-          />
+          <HourlyHeatmap data={data.heatmap} />
 
-          <DailyMetricsTable
-            data={
-              dashboard.dailyMetrics as Parameters<typeof DailyMetricsTable>[0]["data"]
-            }
-          />
+          <DailyMetricsTable data={data.dailyMetrics} />
         </>
       )}
 
-      {!isLoading && !isError && !dashboard && (
+      {!isLoading && !isError && !data && (
         <BrutalAlert variant="info">
           Belum ada data. Import file XLSX/CSV terlebih dahulu.
         </BrutalAlert>

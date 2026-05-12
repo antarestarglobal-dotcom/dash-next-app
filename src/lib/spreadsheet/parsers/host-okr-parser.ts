@@ -4,7 +4,7 @@ import { normalizePlatformName, normalizeShift, isEmptyRow } from "../helpers/no
 import { findHeaderRow } from "../helpers/detect-header";
 import type { HostOkrRow } from "../../validators/import";
 
-interface HostOkrParseResult {
+export interface HostOkrParseResult {
   templateType: "host_okr";
   summary: { validRows: number; rejectedRowsCount: number };
   rows: HostOkrRow[];

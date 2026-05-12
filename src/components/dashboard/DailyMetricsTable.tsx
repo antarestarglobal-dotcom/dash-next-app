@@ -1,39 +1,49 @@
 "use client";
 
-import { createColumnHelper } from "@tanstack/react-table";
 import { BrutalCard } from "@/components/ui/BrutalCard";
-import { BrutalDataTable } from "@/components/ui/BrutalDataTable";
+import { BrutalDataTable, type BrutalColumn } from "@/components/ui/BrutalDataTable";
 import { formatCurrency, formatPercent } from "@/lib/utils";
 
 interface DailyMetricRow {
   id: number;
   date: string;
   dayName: string | null;
-  total: string | null;
-  contributionPercent: string | null;
+  total: number | null;
+  contributionPercent: number | null;
   metric: string;
 }
 
-const columnHelper = createColumnHelper<DailyMetricRow>();
-
-const columns = [
-  columnHelper.accessor("date", { header: "Tanggal" }),
-  columnHelper.accessor("dayName", { header: "Hari", cell: (i) => i.getValue() ?? "-" }),
-  columnHelper.accessor("metric", { header: "Metric" }),
-  columnHelper.accessor("total", {
+const columns: BrutalColumn<DailyMetricRow>[] = [
+  {
+    id: "date",
+    header: "Tanggal",
+    cell: (row) => row.date,
+    sortValue: (row) => row.date,
+  },
+  {
+    id: "dayName",
+    header: "Hari",
+    cell: (row) => row.dayName ?? "-",
+    sortValue: (row) => row.dayName ?? "",
+  },
+  {
+    id: "metric",
+    header: "Metric",
+    cell: (row) => row.metric,
+    sortValue: (row) => row.metric,
+  },
+  {
+    id: "total",
     header: "Total",
-    cell: (i) => {
-      const v = i.getValue();
-      return v ? formatCurrency(parseFloat(v)) : "-";
-    },
-  }),
-  columnHelper.accessor("contributionPercent", {
+    cell: (row) => (row.total !== null ? formatCurrency(row.total) : "-"),
+    sortValue: (row) => row.total ?? null,
+  },
+  {
+    id: "contributionPercent",
     header: "Kontribusi",
-    cell: (i) => {
-      const v = i.getValue();
-      return v ? formatPercent(parseFloat(v)) : "-";
-    },
-  }),
+    cell: (row) => (row.contributionPercent !== null ? formatPercent(row.contributionPercent) : "-"),
+    sortValue: (row) => row.contributionPercent ?? null,
+  },
 ];
 
 interface DailyMetricsTableProps {

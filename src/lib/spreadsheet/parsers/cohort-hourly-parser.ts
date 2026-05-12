@@ -4,7 +4,7 @@ import { detectHourFromHeader } from "../helpers/parse-time";
 import { isEmptyRow, isStopRow } from "../helpers/normalize";
 import type { CohortDailyRow, CohortMetadata } from "../../validators/import";
 
-interface CohortParseResult {
+export interface CohortParseResult {
   templateType: "cohort_hourly";
   metadata: CohortMetadata;
   summary: {

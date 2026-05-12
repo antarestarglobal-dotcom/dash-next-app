@@ -1,27 +1,28 @@
 "use client";
 
-import {
-  useReactTable,
-  getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
-  flexRender,
-  type ColumnDef,
-  type SortingState,
-} from "@tanstack/react-table";
-import { useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { ChevronUp, ChevronDown, ChevronsUpDown } from "lucide-react";
 import { BrutalButton } from "./BrutalButton";
 import { cn } from "@/lib/utils";
 
+export interface BrutalColumn<TData> {
+  id: string;
+  header: ReactNode;
+  cell: (row: TData) => ReactNode;
+  sortValue?: (row: TData) => string | number | null | undefined;
+}
+
 interface BrutalDataTableProps<TData> {
   data: TData[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  columns: ColumnDef<TData, any>[];
+  columns: BrutalColumn<TData>[];
   pageSize?: number;
   globalFilter?: boolean;
   className?: string;
+}
+
+interface SortState {
+  columnId: string;
+  direction: "asc" | "desc";
 }
 
 export function BrutalDataTable<TData>({
@@ -31,28 +32,82 @@ export function BrutalDataTable<TData>({
   globalFilter = false,
   className,
 }: BrutalDataTableProps<TData>) {
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortState | null>(null);
   const [globalFilterValue, setGlobalFilterValue] = useState("");
+  const [pageIndex, setPageIndex] = useState(0);
 
-  const table = useReactTable({
-    data,
-    columns,
-    state: { sorting, globalFilter: globalFilterValue },
-    onSortingChange: setSorting,
-    onGlobalFilterChange: setGlobalFilterValue,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    initialState: { pagination: { pageSize } },
-  });
+  const filteredRows = useMemo(() => {
+    if (!globalFilter) return data;
+    const q = globalFilterValue.trim().toLowerCase();
+    if (!q) return data;
+
+    return data.filter((row) => JSON.stringify(row).toLowerCase().includes(q));
+  }, [data, globalFilter, globalFilterValue]);
+
+  const sortedRows = useMemo(() => {
+    if (!sorting) return filteredRows;
+
+    const column = columns.find((col) => col.id === sorting.columnId);
+    if (!column || !column.sortValue) return filteredRows;
+
+    const rows = [...filteredRows];
+    rows.sort((a, b) => {
+      const aValue = column.sortValue?.(a);
+      const bValue = column.sortValue?.(b);
+
+      if (aValue == null && bValue == null) return 0;
+      if (aValue == null) return 1;
+      if (bValue == null) return -1;
+
+      if (typeof aValue === "number" && typeof bValue === "number") {
+        return sorting.direction === "asc" ? aValue - bValue : bValue - aValue;
+      }
+
+      const cmp = String(aValue).localeCompare(String(bValue), "id", { numeric: true });
+      return sorting.direction === "asc" ? cmp : -cmp;
+    });
+
+    return rows;
+  }, [columns, filteredRows, sorting]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedRows.length / pageSize));
+  const effectivePageIndex = Math.min(pageIndex, totalPages - 1);
+
+  const paginatedRows = useMemo(() => {
+    const start = effectivePageIndex * pageSize;
+    return sortedRows.slice(start, start + pageSize);
+  }, [effectivePageIndex, pageSize, sortedRows]);
+
+  function toggleSort(columnId: string) {
+    setPageIndex(0);
+    setSorting((prev) => {
+      if (!prev || prev.columnId !== columnId) {
+        return { columnId, direction: "asc" };
+      }
+      if (prev.direction === "asc") {
+        return { columnId, direction: "desc" };
+      }
+      return null;
+    });
+  }
+
+  function getRowKey(row: TData, index: number): string {
+    if (row && typeof row === "object" && "id" in (row as Record<string, unknown>)) {
+      const id = (row as Record<string, unknown>).id;
+      if (typeof id === "string" || typeof id === "number") return String(id);
+    }
+    return String(index);
+  }
 
   return (
     <div className={cn("flex flex-col gap-3", className)}>
       {globalFilter && (
         <input
           value={globalFilterValue}
-          onChange={(e) => setGlobalFilterValue(e.target.value)}
+          onChange={(e) => {
+            setGlobalFilterValue(e.target.value);
+            setPageIndex(0);
+          }}
           placeholder="Cari..."
           className="bg-white border-2 border-neutral-950 rounded-none px-3 py-2 text-sm w-full max-w-xs focus:outline-none focus:ring-2 focus:ring-neutral-950"
         />
@@ -61,22 +116,25 @@ export function BrutalDataTable<TData>({
       <div className="overflow-x-auto border-2 border-neutral-950">
         <table className="w-full text-sm border-collapse">
           <thead>
-            {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id} className="bg-neutral-100 border-b-2 border-neutral-950">
-                {headerGroup.headers.map((header) => (
+            <tr className="bg-neutral-100 border-b-2 border-neutral-950">
+              {columns.map((column) => {
+                const isSortable = Boolean(column.sortValue);
+                const isSorted = sorting?.columnId === column.id ? sorting.direction : null;
+
+                return (
                   <th
-                    key={header.id}
+                    key={column.id}
                     className="px-3 py-2 text-left font-bold text-neutral-950 text-xs uppercase tracking-wide whitespace-nowrap border-r border-neutral-300 last:border-r-0"
-                    onClick={header.column.getToggleSortingHandler()}
-                    style={{ cursor: header.column.getCanSort() ? "pointer" : "default" }}
+                    onClick={() => isSortable && toggleSort(column.id)}
+                    style={{ cursor: isSortable ? "pointer" : "default" }}
                   >
                     <div className="flex items-center gap-1">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {header.column.getCanSort() && (
+                      {column.header}
+                      {isSortable && (
                         <span className="text-neutral-400">
-                          {header.column.getIsSorted() === "asc" ? (
+                          {isSorted === "asc" ? (
                             <ChevronUp className="w-3 h-3" />
-                          ) : header.column.getIsSorted() === "desc" ? (
+                          ) : isSorted === "desc" ? (
                             <ChevronDown className="w-3 h-3" />
                           ) : (
                             <ChevronsUpDown className="w-3 h-3" />
@@ -85,12 +143,12 @@ export function BrutalDataTable<TData>({
                       )}
                     </div>
                   </th>
-                ))}
-              </tr>
-            ))}
+                );
+              })}
+            </tr>
           </thead>
           <tbody>
-            {table.getRowModel().rows.length === 0 ? (
+            {paginatedRows.length === 0 ? (
               <tr>
                 <td
                   colSpan={columns.length}
@@ -100,17 +158,17 @@ export function BrutalDataTable<TData>({
                 </td>
               </tr>
             ) : (
-              table.getRowModel().rows.map((row) => (
+              paginatedRows.map((row, rowIndex) => (
                 <tr
-                  key={row.id}
+                  key={getRowKey(row, pageIndex * pageSize + rowIndex)}
                   className="border-b border-neutral-200 hover:bg-neutral-50 last:border-b-0"
                 >
-                  {row.getVisibleCells().map((cell) => (
+                  {columns.map((column) => (
                     <td
-                      key={cell.id}
+                      key={column.id}
                       className="px-3 py-2 text-neutral-950 border-r border-neutral-100 last:border-r-0"
                     >
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      {column.cell(row)}
                     </td>
                   ))}
                 </tr>
@@ -120,26 +178,25 @@ export function BrutalDataTable<TData>({
         </table>
       </div>
 
-      {table.getPageCount() > 1 && (
+      {totalPages > 1 && (
         <div className="flex items-center justify-between">
           <span className="text-xs text-neutral-600">
-            Halaman {table.getState().pagination.pageIndex + 1} dari {table.getPageCount()} &middot;{" "}
-            {table.getFilteredRowModel().rows.length} baris
+            Halaman {effectivePageIndex + 1} dari {totalPages} &middot; {filteredRows.length} baris
           </span>
           <div className="flex gap-2">
             <BrutalButton
               size="sm"
               variant="secondary"
-              onClick={() => table.previousPage()}
-              disabled={!table.getCanPreviousPage()}
+              onClick={() => setPageIndex((prev) => Math.max(0, prev - 1))}
+              disabled={effectivePageIndex === 0}
             >
               &larr; Prev
             </BrutalButton>
             <BrutalButton
               size="sm"
               variant="secondary"
-              onClick={() => table.nextPage()}
-              disabled={!table.getCanNextPage()}
+              onClick={() => setPageIndex((prev) => Math.min(totalPages - 1, prev + 1))}
+              disabled={effectivePageIndex >= totalPages - 1}
             >
               Next &rarr;
             </BrutalButton>

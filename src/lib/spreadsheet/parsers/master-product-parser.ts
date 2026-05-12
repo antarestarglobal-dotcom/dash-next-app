@@ -3,7 +3,7 @@ import { isEmptyRow } from "../helpers/normalize";
 import { findHeaderRow } from "../helpers/detect-header";
 import type { ProductRow, BundleRow } from "../../validators/import";
 
-interface MasterProductParseResult {
+export interface MasterProductParseResult {
   templateType: "master_product";
   summary: { productRows: number; bundleRows: number; rejectedRowsCount: number };
   products: ProductRow[];
