@@ -1,59 +1,92 @@
 import Link from "next/link";
 import { BrutalCard } from "@/components/ui/BrutalCard";
 import { BrutalButton } from "@/components/ui/BrutalButton";
-import { BarChart2, Upload, History } from "lucide-react";
+import { BarChart2, Upload, History, TrendingUp } from "lucide-react";
+
+const CARDS = [
+  {
+    href: "/run-rate",
+    icon: TrendingUp,
+    title: "Run Rate Dashboard",
+    description: "Net Sales, NPM, marketing ratio, target progress, MoM, produk, dan stok — semua dalam satu tampilan.",
+    cta: "Buka Run Rate",
+    variant: "primary" as const,
+    highlight: true,
+  },
+  {
+    href: "/dashboard",
+    icon: BarChart2,
+    title: "Dashboard Cohort",
+    description: "GMV harian, hourly heatmap, dan host leaderboard dari data cohort.",
+    cta: "Buka Dashboard",
+    variant: "secondary" as const,
+    highlight: false,
+  },
+  {
+    href: "/imports",
+    icon: Upload,
+    title: "Import Data",
+    description: "Sync dari Google Sheets atau upload XLSX/CSV. Preview hasil parsing sebelum konfirmasi ke database.",
+    cta: "Import Data",
+    variant: "secondary" as const,
+    highlight: false,
+  },
+  {
+    href: "/imports/history",
+    icon: History,
+    title: "Riwayat Import",
+    description: "Lihat semua riwayat import beserta status, warnings, dan error detail.",
+    cta: "Lihat History",
+    variant: "secondary" as const,
+    highlight: false,
+  },
+] as const;
 
 export default function Home() {
   return (
     <div className="flex flex-col gap-10 py-8">
+      {/* Hero */}
       <div>
-        <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-1">
-          Internal Dashboard
+        <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-1">
+          Internal Dashboard · Antarestar
         </p>
-        <h1 className="text-4xl font-black text-neutral-950 tracking-tight">
+        <h1 className="text-4xl font-black text-neutral-950 tracking-tight leading-none">
           CEO Command Center
         </h1>
-        <p className="text-neutral-600 mt-2 text-sm max-w-lg">
-          Platform pusat data bisnis Antarestar. Import data dari Excel, preview, lalu konfirmasi ke
-          PostgreSQL.
+        <p className="text-neutral-500 mt-3 text-sm max-w-xl">
+          Platform pusat data bisnis Antarestar. Sync langsung dari Google Sheets, lalu analisa
+          performa sales, marketing, stok, dan target dalam satu dashboard terintegrasi.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <BrutalCard>
-          <BarChart2 className="w-7 h-7 mb-4 text-neutral-950" />
-          <h2 className="font-bold text-lg mb-1">Dashboard</h2>
-          <p className="text-sm text-neutral-600 mb-4">
-            Lihat GMV, daily trend, hourly heatmap, dan host leaderboard.
-          </p>
-          <Link href="/dashboard">
-            <BrutalButton className="w-full">Buka Dashboard</BrutalButton>
-          </Link>
-        </BrutalCard>
-
-        <BrutalCard>
-          <Upload className="w-7 h-7 mb-4 text-neutral-950" />
-          <h2 className="font-bold text-lg mb-1">Import Data</h2>
-          <p className="text-sm text-neutral-600 mb-4">
-            Upload file XLSX/CSV, preview hasil parsing, dan confirm import ke database.
-          </p>
-          <Link href="/imports">
-            <BrutalButton className="w-full">Import Data</BrutalButton>
-          </Link>
-        </BrutalCard>
-
-        <BrutalCard>
-          <History className="w-7 h-7 mb-4 text-neutral-950" />
-          <h2 className="font-bold text-lg mb-1">Import History</h2>
-          <p className="text-sm text-neutral-600 mb-4">
-            Lihat riwayat semua import beserta status, warnings, dan error.
-          </p>
-          <Link href="/imports/history">
-            <BrutalButton variant="secondary" className="w-full">
-              Lihat History
-            </BrutalButton>
-          </Link>
-        </BrutalCard>
+      {/* Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        {CARDS.map(({ href, icon: Icon, title, description, cta, variant, highlight }) => (
+          <BrutalCard
+            key={href}
+            className={highlight ? "bg-neutral-950" : undefined}
+          >
+            <div className="flex flex-col gap-4 h-full">
+              <Icon className={`w-7 h-7 ${highlight ? "text-white" : "text-neutral-950"}`} />
+              <div className="flex-1">
+                <h2 className={`font-black text-lg mb-1 ${highlight ? "text-white" : "text-neutral-950"}`}>
+                  {title}
+                </h2>
+                <p className={`text-sm ${highlight ? "text-neutral-300" : "text-neutral-500"}`}>
+                  {description}
+                </p>
+              </div>
+              <Link href={href}>
+                <BrutalButton
+                  variant={highlight ? "secondary" : variant}
+                  className={`w-full ${highlight ? "bg-white text-neutral-950 hover:bg-stone-100" : ""}`}
+                >
+                  {cta}
+                </BrutalButton>
+              </Link>
+            </div>
+          </BrutalCard>
+        ))}
       </div>
     </div>
   );

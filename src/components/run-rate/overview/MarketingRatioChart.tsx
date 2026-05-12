@@ -1,6 +1,15 @@
 "use client";
 
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Legend,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { BrutalCard } from "@/components/ui/BrutalCard";
 import { formatRpCompact } from "@/lib/format";
 import type { MarketingResponse } from "@/lib/validators/run-rate";
@@ -16,6 +25,14 @@ const COLORS: Readonly<Record<Channel, string>> = {
   endorse: "#34d399",
   iklan: "#fb923c",
   other: "#a78bfa",
+};
+const LABELS: Readonly<Record<Channel, string>> = {
+  voucher: "Voucher",
+  affiliate: "Affiliate",
+  sample: "Sample",
+  endorse: "Endorse",
+  iklan: "Iklan",
+  other: "Lainnya",
 };
 
 const buildStackedRows = (marketing: MarketingResponse): Record<string, string | number>[] => {
@@ -40,12 +57,33 @@ export const MarketingRatioChart = ({ marketing }: Props) => {
     <BrutalCard title="Marketing Cost Harian">
       <ResponsiveContainer width="100%" height={300}>
         <BarChart data={chartRows}>
-          <CartesianGrid strokeDasharray="4 4" />
+          <CartesianGrid strokeDasharray="4 4" stroke="#e5e5e5" />
           <XAxis dataKey="day" tick={{ fontSize: 11 }} />
-          <YAxis tickFormatter={(value: number) => formatRpCompact(value)} tick={{ fontSize: 11 }} />
-          <Tooltip formatter={(value: number) => formatRpCompact(value)} />
+          <YAxis
+            tickFormatter={(v: number) => formatRpCompact(v)}
+            tick={{ fontSize: 11 }}
+            width={60}
+          />
+          <Tooltip
+            formatter={(value: number, name: string) => [
+              formatRpCompact(value),
+              LABELS[name as Channel] ?? name,
+            ]}
+            contentStyle={{ border: "2px solid #171717", borderRadius: 0, fontSize: 12 }}
+          />
+          <Legend
+            formatter={(value: string) => LABELS[value as Channel] ?? value}
+            wrapperStyle={{ fontSize: 11 }}
+          />
           {CHANNELS.map((channel) => (
-            <Bar key={channel} dataKey={channel} stackId="marketing" fill={COLORS[channel]} stroke="#171717" strokeWidth={1} />
+            <Bar
+              key={channel}
+              dataKey={channel}
+              stackId="marketing"
+              fill={COLORS[channel]}
+              stroke="#171717"
+              strokeWidth={1}
+            />
           ))}
         </BarChart>
       </ResponsiveContainer>
